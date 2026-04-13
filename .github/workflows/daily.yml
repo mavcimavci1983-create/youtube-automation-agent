@@ -1,1 +1,52 @@
+name: 🎯 Günlük Motivasyon Videosu
 
+on:
+  schedule:
+    - cron: '0 6 * * *'  # Her gün saat 06:00 UTC (09:00 Türkiye)
+  workflow_dispatch:      # Manuel tetikleme de mümkün
+
+jobs:
+  create-and-upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: 📥 Kodu çek
+        uses: actions/checkout@v4
+
+      - name: 🟢 Node.js kur
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 📦 Bağımlılıkları yükle
+        run: npm ci
+
+      - name: 🖼️ System dependencies (jimp için gerekli değil ama ffmpeg lazım)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: 🤖 Motivasyon videosunu oluştur ve yükle
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          YOUTUBE_CHANNEL_ID: ${{ secrets.YOUTUBE_CHANNEL_ID }}
+        run: node schedules/daily-automation.js
+
+      - name: 📊 Log kaydet
+        if: always()
+        run: |
+          echo "Tarih: $(date)" >> run-log.txt
+          echo "Status: ${{ job.status }}" >> run-log.txt
+
+      - name: ✅ Başarı bildirimi
+        if: success()
+        run: echo "🎉 Video başarıyla oluşturuldu ve yüklendi!"
+
+      - name: ❌ Hata bildirimi
+        if: failure()
+        run: echo "💥 Bir hata oluştu, logları kontrol et!"
