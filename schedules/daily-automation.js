@@ -1,581 +1,210 @@
-const cron = require('node-cron');
-const { Logger } = require('../utils/logger');
+require('dotenv').config();
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { google } = require('googleapis');
+const Jimp = require('jimp');
+const ffmpeg = require('fluent-ffmpeg');
+const fs = require('fs');
+const path = require('path');
 
-class DailyAutomation {
-  constructor(agents, database) {
-    this.agents = agents;
-    this.db = database;
-    this.logger = new Logger('DailyAutomation');
-    this.scheduledTasks = new Map();
-    this.isEnabled = true;
-  }
+// ─── CONFIG ───────────────────────────────────────────────
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const YOUTUBE_CLIENT_ID = process.env.YOUTUBE_CLIENT_ID;
+const YOUTUBE_CLIENT_SECRET = process.env.YOUTUBE_CLIENT_SECRET;
+const YOUTUBE_REFRESH_TOKEN = process.env.YOUTUBE_REFRESH_TOKEN;
+const YOUTUBE_CHANNEL_ID = process.env.YOUTUBE_CHANNEL_ID;
 
-  async initialize() {
-    this.logger.info('Initializing daily automation scheduler...');
-    
-    await this.setupScheduledTasks();
-    
-    // Start monitoring loop
-    this.startMonitoringLoop();
-    
-    this.logger.success('Daily automation initialized successfully');
-    return true;
-  }
+// ─── GEMINI: İçerik Üret ─────────────────────────────────
+async function generateContent() {
+  console.log('🤖 Gemini ile içerik üretiliyor...');
+  const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
-  async setupScheduledTasks() {
-    // Daily content generation at 6:00 AM
-    this.scheduledTasks.set('daily-content-generation', 
-      cron.schedule('0 6 * * *', async () => {
-        if (this.isEnabled) {
-          await this.runDailyContentGeneration();
-        }
-      }, { scheduled: false })
-    );
+  const prompt = `
+Sen Türkçe motivasyon videoları için içerik üretiyorsun.
+Bugün için VURUCU ve DİKKAT ÇEKİCİ bir motivasyon videosu içeriği oluştur.
 
-    // Publishing queue processing every 15 minutes
-    this.scheduledTasks.set('publish-queue-processing',
-      cron.schedule('*/15 * * * *', async () => {
-        if (this.isEnabled) {
-          await this.processPublishQueue();
-        }
-      }, { scheduled: false })
-    );
+Şu formatta JSON döndür (başka hiçbir şey yazma):
+{
+  "title": "YouTube başlığı (maksimum 60 karakter, emoji içerebilir)",
+  "description": "YouTube açıklaması (300-500 karakter, hashtag içermeli)",
+  "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
+  "script": "Video metni (60-90 saniyelik, güçlü ve motivasyonel, Türkçe)",
+  "thumbnail_text": "Thumbnail'da yazacak kısa vurucu söz (maksimum 5 kelime)",
+  "hashtags": "#motivasyon #türkçemotivasyon #başarı #hedef #günlükmotivasyon"
+}`;
 
-    // Analytics collection at 9:00 AM daily
-    this.scheduledTasks.set('daily-analytics',
-      cron.schedule('0 9 * * *', async () => {
-        if (this.isEnabled) {
-          await this.collectDailyAnalytics();
-        }
-      }, { scheduled: false })
-    );
+  const result = await model.generateContent(prompt);
+  const text = result.response.text().trim();
 
-    // Weekly strategy review on Sundays at 8:00 AM
-    this.scheduledTasks.set('weekly-strategy-review',
-      cron.schedule('0 8 * * 0', async () => {
-        if (this.isEnabled) {
-          await this.weeklyStrategyReview();
-        }
-      }, { scheduled: false })
-    );
+  // JSON parse
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error('Gemini JSON döndürmedi');
 
-    // Optimization tasks daily at 10:00 PM
-    this.scheduledTasks.set('daily-optimization',
-      cron.schedule('0 22 * * *', async () => {
-        if (this.isEnabled) {
-          await this.runDailyOptimization();
-        }
-      }, { scheduled: false })
-    );
+  const content = JSON.parse(jsonMatch[0]);
+  console.log(`✅ İçerik üretildi: "${content.title}"`);
+  return content;
+}
 
-    // Database maintenance weekly on Saturdays at 3:00 AM
-    this.scheduledTasks.set('database-maintenance',
-      cron.schedule('0 3 * * 6', async () => {
-        if (this.isEnabled) {
-          await this.databaseMaintenance();
-        }
-      }, { scheduled: false })
-    );
+// ─── THUMBNAIL OLUŞTUR ────────────────────────────────────
+async function createThumbnail(thumbnailText) {
+  console.log('🖼️ Thumbnail oluşturuluyor...');
 
-    // Start all scheduled tasks
-    this.scheduledTasks.forEach((task, name) => {
-      task.start();
-      this.logger.info(`Started scheduled task: ${name}`);
-    });
-  }
+  const width = 1280;
+  const height = 720;
 
-  async runDailyContentGeneration() {
-    try {
-      this.logger.info('Starting daily content generation...');
-      
-      const timer = this.logger.startTimer('Daily Content Generation');
-      
-      // Check if we should generate content today
-      const shouldGenerate = await this.shouldGenerateContentToday();
-      
-      if (!shouldGenerate) {
-        this.logger.info('Skipping content generation - sufficient content in pipeline');
-        return;
-      }
+  const image = new Jimp(width, height, 0x1a1a2eff); // Koyu lacivert arka plan
 
-      // Generate content strategy
-      const strategy = await this.agents.strategy.generateContentStrategy();
-      this.logger.info(`Generated strategy: ${strategy.topic}`);
-
-      // Generate script
-      const script = await this.agents.scriptWriter.generateScript(strategy);
-      this.logger.info(`Generated script: ${script.title}`);
-
-      // Generate thumbnail
-      const thumbnail = await this.agents.thumbnailDesigner.generateThumbnail(script);
-      this.logger.info('Generated thumbnail');
-
-      // Optimize SEO
-      const seoData = await this.agents.seoOptimizer.optimize(script, strategy);
-      this.logger.info('Completed SEO optimization');
-
-      // Process through production
-      const productionData = await this.agents.production.processContent({
-        strategy,
-        script,
-        thumbnail,
-        seo: seoData
-      });
-      this.logger.info(`Production completed: ${productionData.id}`);
-
-      // Schedule for publishing
-      await this.agents.publishing.scheduleContent(productionData);
-      this.logger.info('Content scheduled for publishing');
-
-      timer.end();
-      this.logger.success('Daily content generation completed successfully');
-
-      // Log the event
-      await this.logAutomationEvent('daily_content_generation', 'success', {
-        contentId: productionData.id,
-        topic: strategy.topic,
-        scheduledFor: productionData.scheduledPublishTime
-      });
-
-    } catch (error) {
-      this.logger.error('Daily content generation failed:', error);
-      
-      await this.logAutomationEvent('daily_content_generation', 'error', {
-        error: error.message
-      });
-
-      // Send notification about failure
-      await this.sendFailureNotification('Daily Content Generation', error);
+  // Gradient efekti için katmanlar
+  for (let y = 0; y < height; y++) {
+    const alpha = Math.floor((y / height) * 100);
+    for (let x = 0; x < width; x++) {
+      const color = Jimp.rgbaToInt(20 + alpha, 20, 60 + alpha, 255);
+      image.setPixelColor(color, x, y);
     }
   }
 
-  async shouldGenerateContentToday() {
-    // Check content buffer
-    const upcomingContent = await this.agents.publishing.getUpcomingSchedule(3);
-    const bufferDays = parseInt(await this.db.getSetting('content_buffer_days')) || 3;
-    
-    // Check if we have enough content scheduled
-    if (upcomingContent.length >= bufferDays) {
-      return false;
-    }
+  // Yazı ekle
+  const font = await Jimp.loadFont(Jimp.FONT_SANS_64_WHITE);
+  const fontSmall = await Jimp.loadFont(Jimp.FONT_SANS_32_WHITE);
 
-    // Check posting frequency settings
-    const frequency = await this.db.getSetting('posting_frequency') || 'daily';
-    const lastGeneration = await this.db.getSetting('last_content_generation');
-    
-    if (lastGeneration) {
-      const lastDate = new Date(lastGeneration);
-      const today = new Date();
-      const daysSinceLastGeneration = Math.floor((today - lastDate) / (1000 * 60 * 60 * 24));
-      
-      switch (frequency) {
-        case 'daily':
-          return daysSinceLastGeneration >= 1;
-        case 'every-2-days':
-          return daysSinceLastGeneration >= 2;
-        case '3-per-week':
-          return daysSinceLastGeneration >= 2 || [1, 3, 5].includes(today.getDay());
-        case 'weekly':
-          return daysSinceLastGeneration >= 7;
-        default:
-          return true;
-      }
-    }
+  // Ana motivasyon yazısı
+  image.print(
+    font,
+    0, 260,
+    { text: thumbnailText, alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER },
+    width
+  );
 
-    return true;
-  }
+  // Alt yazı
+  image.print(
+    fontSmall,
+    0, 380,
+    { text: '🔥 Günlük Motivasyon', alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER },
+    width
+  );
 
-  async processPublishQueue() {
-    try {
-      const published = await this.agents.publishing.processPublishQueue();
-      
-      if (published > 0) {
-        this.logger.info(`Published ${published} videos from queue`);
-        
-        await this.logAutomationEvent('queue_processing', 'success', {
-          publishedCount: published
-        });
-      }
-    } catch (error) {
-      this.logger.error('Failed to process publish queue:', error);
-      
-      await this.logAutomationEvent('queue_processing', 'error', {
-        error: error.message
-      });
-    }
-  }
+  const thumbnailPath = '/tmp/thumbnail.jpg';
+  await image.quality(90).writeAsync(thumbnailPath);
+  console.log('✅ Thumbnail oluşturuldu');
+  return thumbnailPath;
+}
 
-  async collectDailyAnalytics() {
-    try {
-      this.logger.info('Starting daily analytics collection...');
-      
-      // Get recently published videos
-      const recentVideos = await this.getRecentlyPublishedVideos(7);
-      
-      let processedCount = 0;
-      
-      for (const video of recentVideos) {
-        try {
-          await this.agents.analytics.analyzeVideoPerformance(video.youtube_id);
-          processedCount++;
-          
-          this.logger.info(`Analyzed video: ${video.title}`);
-          
-          // Small delay to avoid API rate limits
-          await this.sleep(2000);
-        } catch (error) {
-          this.logger.error(`Failed to analyze video ${video.youtube_id}:`, error);
-        }
-      }
+// ─── VİDEO OLUŞTUR ────────────────────────────────────────
+async function createVideo(script, thumbnailPath) {
+  console.log('🎬 Video oluşturuluyor...');
 
-      this.logger.success(`Analytics collection completed. Processed ${processedCount} videos`);
-      
-      await this.logAutomationEvent('analytics_collection', 'success', {
-        videosProcessed: processedCount
-      });
+  const outputPath = '/tmp/video.mp4';
 
-    } catch (error) {
-      this.logger.error('Daily analytics collection failed:', error);
-      
-      await this.logAutomationEvent('analytics_collection', 'error', {
-        error: error.message
-      });
-    }
-  }
+  return new Promise((resolve, reject) => {
+    ffmpeg()
+      .input(thumbnailPath)
+      .inputOptions(['-loop 1'])
+      .inputOptions(['-t 60']) // 60 saniye
+      .videoCodec('libx264')
+      .outputOptions([
+        '-pix_fmt yuv420p',
+        '-r 24',
+        '-vf scale=1280:720',
+        '-preset fast',
+        '-crf 23',
+      ])
+      .noAudio()
+      .output(outputPath)
+      .on('end', () => {
+        console.log('✅ Video oluşturuldu');
+        resolve(outputPath);
+      })
+      .on('error', (err) => {
+        console.error('❌ Video hatası:', err.message);
+        reject(err);
+      })
+      .run();
+  });
+}
 
-  async weeklyStrategyReview() {
-    try {
-      this.logger.info('Starting weekly strategy review...');
-      
-      // Analyze performance of last week's content
-      const weeklyAnalytics = await this.agents.analytics.getRecentAnalytics(7);
-      
-      // Update content strategy based on performance
-      if (weeklyAnalytics.topPerformers.length > 0) {
-        const bestPerformingTopics = weeklyAnalytics.topPerformers
-          .map(video => video.videoDetails.title)
-          .slice(0, 3);
-        
-        this.logger.info(`Top performing topics: ${bestPerformingTopics.join(', ')}`);
-      }
+// ─── YOUTUBE'A YÜKLE ──────────────────────────────────────
+async function uploadToYouTube(content, videoPath, thumbnailPath) {
+  console.log('📤 YouTube\'a yükleniyor...');
 
-      // Optimize publishing times
-      await this.agents.publishing.optimizePublishTimes();
-      
-      // Generate strategy insights
-      const insights = await this.generateWeeklyInsights(weeklyAnalytics);
-      
-      this.logger.success('Weekly strategy review completed');
-      
-      await this.logAutomationEvent('weekly_strategy_review', 'success', {
-        insights
-      });
+  const oauth2Client = new google.auth.OAuth2(
+    YOUTUBE_CLIENT_ID,
+    YOUTUBE_CLIENT_SECRET,
+    'http://localhost:3000/callback'
+  );
 
-    } catch (error) {
-      this.logger.error('Weekly strategy review failed:', error);
-      
-      await this.logAutomationEvent('weekly_strategy_review', 'error', {
-        error: error.message
-      });
-    }
-  }
+  oauth2Client.setCredentials({
+    refresh_token: YOUTUBE_REFRESH_TOKEN,
+  });
 
-  async runDailyOptimization() {
-    try {
-      this.logger.info('Starting daily optimization tasks...');
-      
-      // Optimize existing content SEO
-      await this.optimizeExistingContent();
-      
-      // Update keyword performance data
-      await this.updateKeywordPerformance();
-      
-      // Clean up old files
-      await this.cleanupOldFiles();
-      
-      this.logger.success('Daily optimization completed');
-      
-      await this.logAutomationEvent('daily_optimization', 'success');
+  const youtube = google.youtube({ version: 'v3', auth: oauth2Client });
 
-    } catch (error) {
-      this.logger.error('Daily optimization failed:', error);
-      
-      await this.logAutomationEvent('daily_optimization', 'error', {
-        error: error.message
-      });
-    }
-  }
+  // Video yükle
+  const videoResponse = await youtube.videos.insert({
+    part: ['snippet', 'status'],
+    requestBody: {
+      snippet: {
+        title: content.title,
+        description: `${content.description}\n\n${content.hashtags}`,
+        tags: content.tags,
+        categoryId: '26', // How-to & Style
+        defaultLanguage: 'tr',
+        defaultAudioLanguage: 'tr',
+      },
+      status: {
+        privacyStatus: 'public',
+        selfDeclaredMadeForKids: false,
+      },
+    },
+    media: {
+      body: fs.createReadStream(videoPath),
+    },
+  });
 
-  async databaseMaintenance() {
-    try {
-      this.logger.info('Starting database maintenance...');
-      
-      // Create backup
-      const backupPath = await this.db.backup();
-      this.logger.info(`Database backed up to: ${backupPath}`);
-      
-      // Get database stats
-      const stats = await this.db.getStats();
-      this.logger.info(`Database stats: ${JSON.stringify(stats)}`);
-      
-      // Clean old analytics data (older than 90 days)
-      await this.cleanOldAnalytics();
-      
-      this.logger.success('Database maintenance completed');
-      
-      await this.logAutomationEvent('database_maintenance', 'success', {
-        backupPath,
-        stats
-      });
+  const videoId = videoResponse.data.id;
+  console.log(`✅ Video yüklendi: https://youtube.com/watch?v=${videoId}`);
 
-    } catch (error) {
-      this.logger.error('Database maintenance failed:', error);
-      
-      await this.logAutomationEvent('database_maintenance', 'error', {
-        error: error.message
-      });
-    }
-  }
+  // Thumbnail yükle
+  await youtube.thumbnails.set({
+    videoId,
+    media: {
+      body: fs.createReadStream(thumbnailPath),
+    },
+  });
 
-  // Helper methods
-  async getRecentlyPublishedVideos(days) {
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - days);
-    
-    const rows = await this.db.getAllRows(
-      `SELECT * FROM publish_schedule 
-       WHERE status = 'published' AND published_at > ?
-       ORDER BY published_at DESC`,
-      [cutoffDate.toISOString()]
-    );
-    
-    return rows;
-  }
+  console.log('✅ Thumbnail yüklendi');
+  return videoId;
+}
 
-  async generateWeeklyInsights(analytics) {
-    const insights = [];
-    
-    if (analytics.averagePerformanceScore > 80) {
-      insights.push('Content performance is excellent this week');
-    } else if (analytics.averagePerformanceScore < 50) {
-      insights.push('Content performance needs improvement');
-    }
-    
-    if (analytics.topPerformers.length > 0) {
-      insights.push(`Best performing video: ${analytics.topPerformers[0].videoDetails.title}`);
-    }
-    
-    return insights;
-  }
+// ─── ANA FONKSİYON ────────────────────────────────────────
+async function main() {
+  console.log('🚀 Günlük motivasyon videosu oluşturuluyor...\n');
 
-  async optimizeExistingContent() {
-    // Get videos published in last 30 days with low performance
-    const lowPerformingVideos = await this.db.getAllRows(
-      `SELECT ar.* FROM analytics_reports ar
-       JOIN publish_schedule ps ON ar.video_id = ps.id
-       WHERE ar.performance_score < 50 
-       AND ps.published_at > datetime('now', '-30 days')
-       LIMIT 5`
-    );
-    
-    for (const video of lowPerformingVideos) {
-      // Re-analyze and generate optimization suggestions
-      await this.agents.analytics.analyzeVideoPerformance(video.video_id);
-      this.logger.info(`Re-analyzed low performing video: ${video.video_id}`);
-    }
-  }
+  try {
+    // 1. İçerik üret
+    const content = await generateContent();
 
-  async updateKeywordPerformance() {
-    // Update keyword performance based on recent analytics
-    const recentVideos = await this.getRecentlyPublishedVideos(7);
-    
-    for (const video of recentVideos) {
-      const analyticsData = await this.db.getRow(
-        'SELECT * FROM analytics_reports WHERE video_id = ?',
-        [video.id]
-      );
-      
-      if (analyticsData) {
-        const videoDetails = JSON.parse(analyticsData.video_details);
-        const keywords = videoDetails.tags || [];
-        
-        for (const keyword of keywords) {
-          await this.db.updateKeywordPerformance(
-            keyword,
-            videoDetails.statistics.viewCount,
-            video.youtube_id
-          );
-        }
-      }
-    }
-  }
+    // 2. Thumbnail oluştur
+    const thumbnailPath = await createThumbnail(content.thumbnail_text);
 
-  async cleanupOldFiles() {
-    // Clean up temporary files older than 7 days
-    const fs = require('fs').promises;
-    const path = require('path');
-    
-    const tempDir = path.join(__dirname, '..', 'temp');
-    const uploadsDir = path.join(__dirname, '..', 'uploads');
-    
-    try {
-      await this.cleanDirectoryOldFiles(tempDir, 7);
-      await this.cleanDirectoryOldFiles(uploadsDir, 30);
-      this.logger.info('Old files cleaned up');
-    } catch (error) {
-      this.logger.error('Failed to clean up old files:', error);
-    }
-  }
+    // 3. Video oluştur
+    const videoPath = await createVideo(content.script, thumbnailPath);
 
-  async cleanDirectoryOldFiles(directory, days) {
-    const fs = require('fs').promises;
-    const path = require('path');
-    
-    try {
-      const files = await fs.readdir(directory);
-      const cutoffTime = Date.now() - (days * 24 * 60 * 60 * 1000);
-      
-      for (const file of files) {
-        const filePath = path.join(directory, file);
-        const stats = await fs.stat(filePath);
-        
-        if (stats.mtime.getTime() < cutoffTime) {
-          await fs.unlink(filePath);
-        }
-      }
-    } catch (error) {
-      // Directory might not exist, which is fine
-    }
-  }
+    // 4. YouTube'a yükle
+    const videoId = await uploadToYouTube(content, videoPath, thumbnailPath);
 
-  async cleanOldAnalytics() {
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - 90);
-    
-    await this.db.executeQuery(
-      'DELETE FROM analytics_reports WHERE analyzed_at < ?',
-      [cutoffDate.toISOString()]
-    );
-  }
+    // 5. Temizlik
+    fs.unlinkSync(videoPath);
+    fs.unlinkSync(thumbnailPath);
 
-  async logAutomationEvent(eventType, status, data = {}) {
-    await this.db.executeQuery(
-      'INSERT INTO automation_events (event_type, status, data, created_at) VALUES (?, ?, ?, datetime("now"))',
-      [eventType, status, JSON.stringify(data)]
-    );
-  }
+    console.log(`\n🎉 BAŞARILI! Video ID: ${videoId}`);
+    console.log(`🔗 https://youtube.com/watch?v=${videoId}`);
+    process.exit(0);
 
-  async sendFailureNotification(taskName, error) {
-    // This would integrate with notification services (email, Slack, etc.)
-    this.logger.error(`AUTOMATION FAILURE - ${taskName}: ${error.message}`);
-    
-    // Could send webhook notification, email, etc.
-    // For now, just log it prominently
-  }
-
-  startMonitoringLoop() {
-    // Monitor system health every hour
-    setInterval(async () => {
-      try {
-        await this.performHealthCheck();
-      } catch (error) {
-        this.logger.error('Health check failed:', error);
-      }
-    }, 60 * 60 * 1000); // 1 hour
-  }
-
-  async performHealthCheck() {
-    const health = {
-      timestamp: new Date().toISOString(),
-      database: false,
-      agents: {},
-      scheduledTasks: {},
-      systemResources: {}
-    };
-
-    // Check database
-    try {
-      await this.db.getAllRows('SELECT 1');
-      health.database = true;
-    } catch (error) {
-      health.database = false;
-    }
-
-    // Check scheduled tasks
-    this.scheduledTasks.forEach((task, name) => {
-      health.scheduledTasks[name] = task.running;
-    });
-
-    // Get system resources (simplified)
-    health.systemResources = {
-      uptime: process.uptime(),
-      memory: process.memoryUsage(),
-      nodeVersion: process.version
-    };
-
-    // Log health status
-    const healthScore = this.calculateHealthScore(health);
-    
-    if (healthScore < 80) {
-      this.logger.warn(`System health score: ${healthScore}/100`, health);
-    } else {
-      this.logger.info(`System health check passed: ${healthScore}/100`);
-    }
-    
-    return health;
-  }
-
-  calculateHealthScore(health) {
-    let score = 100;
-    
-    if (!health.database) score -= 30;
-    
-    const tasksRunning = Object.values(health.scheduledTasks).filter(Boolean).length;
-    const totalTasks = Object.keys(health.scheduledTasks).length;
-    
-    if (totalTasks > 0 && tasksRunning < totalTasks) {
-      score -= ((totalTasks - tasksRunning) / totalTasks) * 20;
-    }
-    
-    return Math.max(0, Math.round(score));
-  }
-
-  // Control methods
-  async pauseAutomation() {
-    this.isEnabled = false;
-    this.logger.info('Automation paused');
-  }
-
-  async resumeAutomation() {
-    this.isEnabled = true;
-    this.logger.info('Automation resumed');
-  }
-
-  async stopAutomation() {
-    this.scheduledTasks.forEach((task, name) => {
-      task.stop();
-      this.logger.info(`Stopped scheduled task: ${name}`);
-    });
-    
-    this.isEnabled = false;
-    this.logger.info('All automation tasks stopped');
-  }
-
-  sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
-
-  async getAutomationStatus() {
-    return {
-      enabled: this.isEnabled,
-      scheduledTasks: Array.from(this.scheduledTasks.keys()).map(name => ({
-        name,
-        running: this.scheduledTasks.get(name).running
-      })),
-      lastHealthCheck: this.lastHealthCheck,
-      uptime: process.uptime()
-    };
+  } catch (error) {
+    console.error('\n❌ HATA:', error.message);
+    console.error(error.stack);
+    process.exit(1);
   }
 }
 
-module.exports = { DailyAutomation };
+main();
