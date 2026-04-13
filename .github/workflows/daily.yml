@@ -1,52 +1,30 @@
-name: 🎯 Günlük Motivasyon Videosu
+name: Günlük Motivasyon Videosu
 
 on:
+  workflow_dispatch: # Manuel başlatmak için
   schedule:
-    - cron: '0 6 * * *'  # Her gün saat 06:00 UTC (09:00 Türkiye)
-  workflow_dispatch:      # Manuel tetikleme de mümkün
+    - cron: '0 0 * * *' # Her gün gece 12'de otomatik çalışır
 
 jobs:
-  create-and-upload:
+  build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-
     steps:
-      - name: 📥 Kodu çek
-        uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v3
 
-      - name: 🟢 Node.js kur
-        uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
         with:
           node-version: '20'
-          cache: 'npm'
 
-      - name: 📦 Bağımlılıkları yükle
-        run: npm ci
+      - name: Install Dependencies
+        run: npm install
 
-      - name: 🖼️ System dependencies (jimp için gerekli değil ama ffmpeg lazım)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg
-
-      - name: 🤖 Motivasyon videosunu oluştur ve yükle
+      - name: Run Automation
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
           YOUTUBE_CHANNEL_ID: ${{ secrets.YOUTUBE_CHANNEL_ID }}
-        run: node schedules/daily-automation.js
-
-      - name: 📊 Log kaydet
-        if: always()
-        run: |
-          echo "Tarih: $(date)" >> run-log.txt
-          echo "Status: ${{ job.status }}" >> run-log.txt
-
-      - name: ✅ Başarı bildirimi
-        if: success()
-        run: echo "🎉 Video başarıyla oluşturuldu ve yüklendi!"
-
-      - name: ❌ Hata bildirimi
-        if: failure()
-        run: echo "💥 Bir hata oluştu, logları kontrol et!"
+        run: node index.js
