@@ -6,6 +6,10 @@ const ffmpeg = require('fluent-ffmpeg');
 const fs = require('fs');
 const path = require('path');
 
+// DEBUG - sonra sil
+console.log('API Key var mı:', !!process.env.GEMINI_API_KEY);
+console.log('API Key ilk 8 karakter:', process.env.GEMINI_API_KEY?.substring(0, 8));
+
 // ─── CONFIG ───────────────────────────────────────────────
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const YOUTUBE_CLIENT_ID = process.env.YOUTUBE_CLIENT_ID;
