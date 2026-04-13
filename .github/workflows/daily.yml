@@ -1,9 +1,9 @@
 name: Günlük Motivasyon Videosu
 
 on:
-  workflow_dispatch: # Manuel başlatma butonu
+  workflow_dispatch: # Bu satır "Run workflow" butonunu çıkarır
   schedule:
-    - cron: '0 9 * * *' # Her sabah 09:00'da (UTC) otomatik çalışır
+    - cron: '0 9 * * *' # Her gün sabah 09:00'da çalışır
 
 jobs:
   run-automation:
@@ -16,7 +16,6 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: '20'
-          cache: 'npm'
 
       - name: Install Dependencies
         run: npm install
