@@ -21,7 +21,7 @@ const YOUTUBE_CHANNEL_ID = process.env.YOUTUBE_CHANNEL_ID;
 async function generateContent() {
   console.log('🤖 Gemini ile içerik üretiliyor...');
   const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
 
   const prompt = `
 Sen Türkçe motivasyon videoları için içerik üretiyorsun.
