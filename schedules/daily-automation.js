@@ -103,43 +103,48 @@ JSON formatında döndür:
 
 // ─── 2. ELEVENLABS: Ses Üret ─────────────────────────────
 async function generateVoice(scriptParts) {
-  console.log('🎙️ ElevenLabs ile ses üretiliyor...');
+  console.log('🎙️ Google TTS ile ses üretiliyor...');
 
-  const fullScript = scriptParts.join('\n\n');
-  console.log(`Script uzunluğu: ${fullScript.length} karakter`);
-
-  // Rachel sesi - doğal ve güçlü
-  const voiceId = '21m00Tcm4TlvDq8ikWAM';
-
-  const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
-    method: 'POST',
-    headers: {
-      'Accept': 'audio/mpeg',
-      'Content-Type': 'application/json',
-      'xi-api-key': ELEVENLABS_API_KEY,
-    },
-    body: JSON.stringify({
-      text: fullScript,
-      model_id: 'eleven_multilingual_v2',
-      voice_settings: {
-        stability: 0.5,
-        similarity_boost: 0.8,
-        style: 0.6,
-        use_speaker_boost: true,
-      },
-    }),
-  });
-
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`ElevenLabs hatası: ${response.status} - ${err}`);
+  const fullScript = scriptParts.join('... ');
+  const encodedText = encodeURIComponent(fullScript.substring(0, 200));
+  
+  // gTTS benzeri - ücretsiz Google Translate TTS
+  const chunks = [];
+  const words = fullScript.split(' ');
+  const chunkSize = 40;
+  
+  for (let i = 0; i < words.length; i += chunkSize) {
+    chunks.push(words.slice(i, i + chunkSize).join(' '));
   }
 
-  const audioBuffer = await response.arrayBuffer();
-  const audioPath = '/tmp/voice.mp3';
-  fs.writeFileSync(audioPath, Buffer.from(audioBuffer));
-  console.log(`✅ Ses üretildi: ${(audioBuffer.byteLength / 1024).toFixed(0)} KB`);
-  return audioPath;
+  const audioPaths = [];
+  for (let i = 0; i < chunks.length; i++) {
+    const text = encodeURIComponent(chunks[i]);
+    const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${text}&tl=tr&client=tw-ob`;
+    const audioPath = `/tmp/voice_chunk_${i}.mp3`;
+    await downloadFile(url, audioPath);
+    audioPaths.push(audioPath);
+    await new Promise(r => setTimeout(r, 500));
+  }
+
+  // Chunk'ları birleştir
+  const listPath = '/tmp/audio_list.txt';
+  fs.writeFileSync(listPath, audioPaths.map(p => `file '${p}'`).join('\n'));
+  
+  const finalAudioPath = '/tmp/voice.mp3';
+  await new Promise((resolve, reject) => {
+    ffmpeg()
+      .input(listPath)
+      .inputOptions(['-f concat', '-safe 0'])
+      .outputOptions(['-c copy'])
+      .output(finalAudioPath)
+      .on('end', resolve)
+      .on('error', reject)
+      .run();
+  });
+
+  console.log('✅ Ses üretildi');
+  return finalAudioPath;
 }
 
 // ─── 3. PEXELS: Video İndir ──────────────────────────────
