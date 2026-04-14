@@ -1,11 +1,10 @@
 {
-  "name": "turkish-motivation-videos",
+  "name": "youtube-automation-agent",
   "version": "1.0.0",
-  "description": "Gemini AI ile otomatik Türkçe motivasyon videoları",
+  "description": "Groq AI ile otomatik Türkçe motivasyon videoları",
   "main": "schedules/daily-automation.js",
   "scripts": {
     "start": "node schedules/daily-automation.js",
-    "test": "node test/test-run.js",
     "setup": "node scripts/oauth-setup.js"
   },
   "dependencies": {
@@ -15,6 +14,9 @@
     "fluent-ffmpeg": "^2.1.3",
     "dotenv": "^16.4.5",
     "axios": "^1.7.7",
-    "open": "^10.1.0",
-    "node-cron": "^3.0.3"
+    "open": "^10.1.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   }
+}
