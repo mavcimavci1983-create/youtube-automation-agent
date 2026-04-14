@@ -21,7 +21,31 @@ const YOUTUBE_CHANNEL_ID = process.env.YOUTUBE_CHANNEL_ID;
 async function generateContent() {
   console.log('🤖 Gemini ile içerik üretiliyor...');
   const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+  
+  // Çalışan model listesi - sırayla dener
+  const models = [
+    'gemini-2.0-flash-lite',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash-latest',
+    'gemini-1.5-flash-8b',
+  ];
+  
+  let model;
+  for (const modelName of models) {
+    try {
+      console.log(`Model deneniyor: ${modelName}`);
+      model = genAI.getGenerativeModel({ model: modelName });
+      // Test et
+      await model.generateContent('test');
+      console.log(`✅ Model çalışıyor: ${modelName}`);
+      break;
+    } catch (e) {
+      console.log(`❌ ${modelName} çalışmadı: ${e.message.substring(0, 50)}`);
+      model = null;
+    }
+  }
+  
+  if (!model) throw new Error('Hiçbir Gemini modeli çalışmadı!');
 
   const prompt = `
 Sen Türkçe motivasyon videoları için içerik üretiyorsun.
