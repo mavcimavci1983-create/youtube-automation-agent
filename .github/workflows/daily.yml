@@ -24,7 +24,10 @@ jobs:
 
       - name: Install Dependencies
         run: npm install
-
+        
+       - name: Install Edge-TTS
+        run: pip install edge-tts --break-system-packages
+        
       - name: Run Video Creator
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
