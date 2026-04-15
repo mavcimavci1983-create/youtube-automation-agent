@@ -15,7 +15,7 @@ const YOUTUBE_REFRESH_TOKEN = process.env.YOUTUBE_REFRESH_TOKEN;
 
 function fixTurkish(text) {
   if (!text) return '';
-  // ASCII'ye cevirmek yerine, bozuk encoding'i duzelt
+  // Sadece bozuk encoding'i duzelt, dogru karakterlere dokunma
   return text
     .replace(/Ã\u009e/g, 'Ş').replace(/Ã\u009f/g, 'ş')
     .replace(/Ä\u00b0/g, 'İ').replace(/Ä\u00b1/g, 'ı')
@@ -120,10 +120,22 @@ async function generateStoryContent() {
   console.log('Hikaye tipi:', story.type);
 
   var storyPrompts = {
-    tarihi: 'Edison, Einstein, Ataturk, Walt Disney veya Steve Jobs hakkinda gercek bir anekdot yaz.',
-    bilge_genc: 'Yasli bilge bir dede ile genc bir adam arasinda gecen hikaye yaz.',
-    baba_ogul: 'Bir baba ile oglu arasinda gecen derin bir an anlat.',
-    is_insani: 'Basarili bir is insani ile genc ciragi arasinda gecen sahne yaz.',
+    tarihi: 'Edison, Einstein, Atatürk, Walt Disney, Elon Musk, Steve Jobs veya Nikola Tesla hakkında ' +
+      'gerçek bir kriz anını anlat. O an nasıl bir seçim yaptı? Ne hissetti? ' +
+      'Gerçek diyalog ekle, sanki oradaymış gibi yaz.',
+
+    bilge_genc: 'Yaşlı bilge bir dede ile hayal kırıklığına uğramış genç bir adam arasında geçen sahneyi yaz. ' +
+      'Genç bir şikayetle geliyor. Dede basit ama derin bir şeyle cevap veriyor. ' +
+      'O cevap gencin dünyasını değiştiriyor. Somut bir metafor kullan.',
+
+    baba_ogul: 'Bir baba ölüm döşeğinde oğluna son sözlerini söylüyor. ' +
+      'Ya da bir baba oğlunun en büyük başarısızlık anında yanında. ' +
+      'O an söylenen bir cümle oğlunun hayatını değiştiriyor. ' +
+      'Duygu yoğun ama abartısız olsun.',
+
+    is_insani: 'Dünyaca tanınan bir iş insanı genç bir girişimciye en karanlık dönemini anlatıyor. ' +
+      'Şirket batmak üzereydi. O an ne yaptı? Hangi kararı verdi? ' +
+      'Gerçek rakamlar ve somut detaylar ekle.',
   };
 
   // ADIM 1: Önce sadece script üret
@@ -132,21 +144,38 @@ async function generateStoryContent() {
     messages: [
       {
         role: 'system',
-        content: 'Sen Turkce motivasyon hikayeleri yaziyorsun. Sadece hikaye metnini yaz, baska hicbir sey yazma.',
+        content: 'Sen Türkiyenin en iyi motivasyon hikayecisisin. ' +
+          'Tony Robbins, Les Brown ve Şeb-i Arus tarzını birleştiren, ' +
+          'insanı derinden sarsan, gözyaşı getiren hikayeler yazıyorsun. ' +
+          'Türkçe karakterleri MUTLAKA kullan: ş, ğ, ü, ö, ç, ı, İ, Ş, Ğ, Ü, Ö, Ç. ' +
+          'SADECE hikaye metnini yaz, başlık veya açıklama ekleme.',
       },
       {
         role: 'user',
         content: storyPrompts[story.type] + '\n\n' +
-          'KURALLAR:\n' +
-          '- Tam olarak 130-150 kelime yaz\n' +
-          '- Gercekten yasanmis gibi hissettir\n' +
-          '- Muhakkak diyalog kullan (en az 3 satir konusma)\n' +
-          '- Son 2 cumlede izleyiciye don, Sen de... diye basla\n' +
-          '- Kisa ve vurucu cumleler kullan\n\n' +
-          'Sadece hikaye metnini yaz, baslik veya aciklama ekleme.',
+          'ZORUNLU KURALLAR:\n' +
+          '- Tam olarak 130-145 kelime yaz\n' +
+          '- İlk cümle ÇARPICI olsun — okuyucu duraksasın\n' +
+          '- Mutlaka 3-4 satır diyalog olsun, gerçek konuşma gibi\n' +
+          '- Somut detaylar ver: yıl, şehir, meslek, isim\n' +
+          '- Duygusal zirve: karakterin içinde bir şey kırılsın veya aydınlansın\n' +
+          '- Son 3 cümle izleyiciye dönsün: "Sen de..." veya "Bugün sen..."\n' +
+          '- Her cümle maksimum 10 kelime\n' +
+          '- Türkçe karakterleri doğru kullan: ş, ğ, ü, ö, ç, ı\n\n' +
+          'GÜÇLÜ HİKAYE ÖRNEĞİ (bu seviyede yaz):\n' +
+          '1971. NASA mühendisi John, 3 yıldır aynı hesabı yapıyordu.\n' +
+          'Her seferinde 0.001 fark çıkıyordu.\n' +
+          'Patronu dedi ki: Bırak artık, kimse fark etmez.\n' +
+          'John bırakmadı.\n' +
+          'O 0.001, Apollo 13 i kurtardı.\n' +
+          'Ekip ona sordu: Neden vazgeçmedin?\n' +
+          'John sadece şunu dedi: Çünkü birisi bir gün o rakama güvenecekti.\n' +
+          'Bugün sen de küçük bir şeyi doğru yapmaktan yoruldun mu?\n' +
+          'O küçük şey, bir gün birinin hayatını kurtarabilir.\n' +
+          'Bırakma.',
       },
     ],
-    temperature: 0.92,
+    temperature: 0.95,
     max_tokens: 1000,
   });
 
