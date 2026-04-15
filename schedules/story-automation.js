@@ -15,13 +15,14 @@ const YOUTUBE_REFRESH_TOKEN = process.env.YOUTUBE_REFRESH_TOKEN;
 
 function fixTurkish(text) {
   if (!text) return '';
+  // ASCII'ye cevirmek yerine, bozuk encoding'i duzelt
   return text
-    .replace(/\u015e/g, 'S').replace(/\u015f/g, 's')
-    .replace(/\u0130/g, 'I').replace(/\u0131/g, 'i')
-    .replace(/\u00dc/g, 'U').replace(/\u00fc/g, 'u')
-    .replace(/\u00d6/g, 'O').replace(/\u00f6/g, 'o')
-    .replace(/\u00c7/g, 'C').replace(/\u00e7/g, 'c')
-    .replace(/\u011e/g, 'G').replace(/\u011f/g, 'g');
+    .replace(/Ã\u009e/g, 'Ş').replace(/Ã\u009f/g, 'ş')
+    .replace(/Ä\u00b0/g, 'İ').replace(/Ä\u00b1/g, 'ı')
+    .replace(/Ã\u009c/g, 'Ü').replace(/Ã\u00bc/g, 'ü')
+    .replace(/Ã\u0096/g, 'Ö').replace(/Ã\u00b6/g, 'ö')
+    .replace(/Ã\u0087/g, 'Ç').replace(/Ã\u00a7/g, 'ç')
+    .replace(/Ä\u009e/g, 'Ğ').replace(/Ä\u009f/g, 'ğ');
 }
 
 function cleanJson(text) {
@@ -85,14 +86,35 @@ async function generateStoryContent() {
 
   var day = new Date().getDay();
   var storyTypes = [
-    { type: 'tarihi', pexels: 'historical achievement success determination' },
-    { type: 'bilge_genc', pexels: 'old man mountain wisdom peaceful' },
-    { type: 'baba_ogul', pexels: 'father son walking sunset emotional' },
-    { type: 'is_insani', pexels: 'business mentor office success young' },
-    { type: 'tarihi', pexels: 'perseverance struggle victory nature' },
-    { type: 'bilge_genc', pexels: 'mountain peak clouds sunrise inspiration' },
-    { type: 'baba_ogul', pexels: 'family nature walk forest together' },
-  ];
+  {
+    type: 'tarihi',
+    pexels: 'inventor laboratory experiment discovery',
+  },
+  {
+    type: 'bilge_genc',
+    pexels: 'elderly man young person talking outdoor',
+  },
+  {
+    type: 'baba_ogul',
+    pexels: 'father teaching son life lesson walk',
+  },
+  {
+    type: 'is_insani',
+    pexels: 'mentor young entrepreneur office meeting',
+  },
+  {
+    type: 'tarihi',
+    pexels: 'soldier warrior strength courage battle',
+  },
+  {
+    type: 'bilge_genc',
+    pexels: 'wise old man nature meditation peaceful',
+  },
+  {
+    type: 'baba_ogul',
+    pexels: 'parent child bonding love family outdoor',
+  },
+];
 
   var story = storyTypes[day % storyTypes.length];
   console.log('Hikaye tipi:', story.type);
@@ -182,7 +204,7 @@ async function generateVoice(script) {
   var audioPath = '/tmp/voice.mp3';
   var vttPath = '/tmp/subtitles.vtt';
 
-  fs.writeFileSync(scriptPath, script, 'utf8');
+ fs.writeFileSync(scriptPath, '\uFEFF' + script, 'utf8');
 
   await runCommand(
     'edge-tts --voice tr-TR-AhmetNeural --file "' + scriptPath + '" ' +
@@ -345,7 +367,7 @@ async function createShortsVideo(videoPaths, audioPath, duration, srtPath) {
         '-c:a aac', '-b:a 128k',
         '-shortest', '-movflags +faststart',
       ])
-      .videoFilter("subtitles=" + srtPath + ":force_style='FontSize=18,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=2,Shadow=1,Alignment=2,MarginV=80'")
+      .videoFilter("subtitles=" + srtPath + ":force_style='FontSize=14,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=2,Shadow=1,Alignment=2,MarginV=40'")
       .output(finalPath)
       .on('end', resolve)
       .on('error', reject)
