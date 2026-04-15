@@ -7,7 +7,7 @@
     "start": "node schedules/daily-automation.js",
     "setup": "node scripts/oauth-setup.js"
   },
-  "dependencies": {
+"dependencies": {
     "groq-sdk": "^0.9.1",
     "googleapis": "^144.0.0",
     "jimp": "^0.22.12",
@@ -15,8 +15,5 @@
     "dotenv": "^16.4.5",
     "axios": "^1.7.7",
     "open": "^10.1.0"
-  },
-  "engines": {
-    "node": ">=20.0.0"
   }
 }
