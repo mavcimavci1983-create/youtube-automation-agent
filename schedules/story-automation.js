@@ -115,45 +115,32 @@ Her hikaye bir ders içeriyor, izleyiciyi derinden etkiliyor.
 SADECE geçerli JSON döndür. Asla markdown veya açıklama ekleme.`,
       },
       {
-        role: 'user',
+  role: 'user',
         content: `${story.setup} bir hikaye yaz. Karakterler: ${story.characters}. Ortam: ${story.setting}.
 
-ZORUNLU KURALLAR:
-- Tam olarak 130-145 kelime (60 saniye için)
-- Gerçekmiş gibi hissettir — tarih, yer, detay ver
-- Diyalog kullan — karakterler konuşsun
-- Tek güçlü bir ders ver
-- Sona doğru izleyiciye dön ve o dersi ona uygula
-- Duygusal ama abartısız ol
+UYARI: Script alani KESINLIKLE minimum 130 kelime olmali. Daha az yazarsan sistem reddedecek.
 
-ÖRNEK YAPI:
-"[Giriş — sahneyi kur, 2 cümle]
-[Karakter 1 bir şey yapıyor/söylüyor]
-[Karakter 2 şaşırıyor/soruyor]
-[Karakter 1 ders veriyor — diyalog]
-[Sessizlik — düşündürücü an]
-[İzleyiciye dön — sen de...]"
+Script yapisi (her bolumu yaz, atlama):
+1. SAHNE KUR (20-25 kelime): Nerede, ne zaman, kim var
+2. OLAY BASLIYOR (25-30 kelime): Karakter bir seyle karsilasıyor
+3. DIYALOG (35-40 kelime): Iki karakter konusuyor, en az 3 satir diyalog
+4. DERS ANLATILIYOR (25-30 kelime): Hikayenin ozu ortaya cikiyor
+5. IZLEYICIYE DON (20-25 kelime): Sen de... diye basla, hayatina uygula
 
-ÖRNEK HİKAYE (bu kalitede yaz):
-"1962 yılı. Edison'un laboratuvarı yanmıştı. Her şey kül olmuştu. Oğlu koşarak geldi: Baba, ne yapacağız? Edison güldü. Şansımız var oğlum, dedi. Tüm hatalarımız da yandı. Yarın temiz sayfa açıyoruz. İki yıl sonra Edison tarihin en büyük icatlarından birini yaptı. Sen de bugün bir şey kaybettin mi? O kayıp aslında yeniden başlama iznin. Kullan onu."
+ORNEK (bu uzunlukta yaz):
+1952 yilinin soguk bir sabahi. Ankara'da kucuk bir atolyede yasli bir demirci calisiyordu. Yaninda genc ciragi vardi. Cirak saatlerce ayni demiri dovdu ama sekil vermekte zorlanirdi. Biktim, dedi. Bu is benim icin degil. Usta elindeki demiri aldi. Bak, dedi. Bu demir sert cunku soguk. Isitmadan sekil vermez. Basarisizlik da boyledir. Seni isitir, yumusatir. Sonra hayat sekil verebilir sana. Cirak o gun anladi. Zorluklar onu kirmiyordu. Hazirliyordu. Sen de bugun zorlanıyor musun? O zorluk seni isitiyor. Sekillenmeye hazirlaniyorsun. Birakma.
 
-SADECE bu JSON formatında döndür:
+SADECE JSON dondur:
 {
-  "title": "hikaye başlığı 45-55 karakter #Shorts",
-  "description": "hikayenin özü 250-300 karakter, yorum yapmaya teşvik et",
-  "tags": ["shorts", "hikaye", "motivasyon", "turkce", "ilham", "gercek", "basari"],
+  "title": "hikaye basligi 45-55 karakter #Shorts",
+  "description": "250-300 karakter aciklama",
+  "tags": ["shorts", "hikaye", "motivasyon", "turkce", "ilham"],
   "pexels_query": "${story.pexels}",
-  "script": "TAM HİKAYE METNİ — 130-145 kelime",
-  "hashtags": "#Shorts #hikaye #motivasyon #turkce #ilham #gercek",
+  "script": "BURAYA TAM HIKAYEYI YAZ - 5 bolumun tamami - minimum 130 kelime",
+  "hashtags": "#Shorts #hikaye #motivasyon #turkce #ilham",
   "thumbnail_title": "IKI KELIME",
-  "thumbnail_subtitle": "hikayeden vurucu cumle"
+  "thumbnail_subtitle": "vurucu cumle"
 }`,
-      },
-    ],
-    temperature: 0.92,
-    max_tokens: 2000,
-  });
-
   const text = completion.choices[0].message.content.trim();
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error('JSON bulunamadı: ' + text.substring(0, 300));
