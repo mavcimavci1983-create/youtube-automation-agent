@@ -6,17 +6,17 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 const http = require('http');
+const { exec } = require('child_process');
 
 // ─── CONFIG ───────────────────────────────────────────────
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
 const PEXELS_API_KEY = process.env.PEXELS_API_KEY;
 const YOUTUBE_CLIENT_ID = process.env.YOUTUBE_CLIENT_ID;
 const YOUTUBE_CLIENT_SECRET = process.env.YOUTUBE_CLIENT_SECRET;
 const YOUTUBE_REFRESH_TOKEN = process.env.YOUTUBE_REFRESH_TOKEN;
-const YOUTUBE_CHANNEL_ID = process.env.YOUTUBE_CHANNEL_ID;
 
-// Türkçe karakter düzeltme
+// ─── YARDIMCI FONKSİYONLAR ───────────────────────────────
+
 function fixTurkish(text) {
   if (!text) return '';
   return text
@@ -28,7 +28,6 @@ function fixTurkish(text) {
     .replace(/\u011e/g, 'Ğ').replace(/\u011f/g, 'ğ');
 }
 
-// Dosya indir
 function downloadFile(url, dest) {
   return new Promise((resolve, reject) => {
     const file = fs.createWriteStream(dest);
@@ -36,18 +35,40 @@ function downloadFile(url, dest) {
     protocol.get(url, (response) => {
       if (response.statusCode === 301 || response.statusCode === 302) {
         file.close();
+        fs.unlinkSync(dest);
         return downloadFile(response.headers.location, dest).then(resolve).catch(reject);
+      }
+      if (response.statusCode !== 200) {
+        file.close();
+        reject(new Error(`HTTP ${response.statusCode}: ${url}`));
+        return;
       }
       response.pipe(file);
       file.on('finish', () => file.close(resolve));
     }).on('error', (err) => {
-      fs.unlink(dest, () => {});
+      try { fs.unlinkSync(dest); } catch(e) {}
       reject(err);
     });
   });
 }
 
-// ─── 1. GROQ: İçerik Üret ────────────────────────────────
+function runCommand(command) {
+  return new Promise((resolve, reject) => {
+    exec(command, { maxBuffer: 1024 * 1024 * 10 }, (error, stdout, stderr) => {
+      if (error) {
+        reject(new Error(`Komut hatası: ${error.message}\nStderr: ${stderr}`));
+      } else {
+        resolve(stdout);
+      }
+    });
+  });
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// ─── 1. GROQ: İÇERİK ÜRET ───────────────────────────────
 async function generateContent() {
   console.log('🤖 Groq ile içerik üretiliyor...');
   const groq = new Groq({ apiKey: GROQ_API_KEY });
@@ -57,28 +78,28 @@ async function generateContent() {
     messages: [
       {
         role: 'system',
-        content: 'Sen profesyonel Türkçe motivasyon videoları için içerik üretiyorsun. Sadece JSON döndür, markdown kullanma, kod bloğu kullanma.'
+        content: 'Sen profesyonel Türkçe motivasyon videoları için içerik üretiyorsun. SADECE geçerli JSON döndür. Markdown, kod bloğu, açıklama yazma.'
       },
       {
         role: 'user',
-        content: `Bugün için güçlü, izleyiciyi derinden etkileyen bir motivasyon videosu içeriği oluştur.
+        content: `Güçlü bir Türkçe motivasyon videosu için içerik üret.
 
-JSON formatında döndür:
+SADECE bu JSON formatında döndür:
 {
-  "title": "YouTube başlığı (50-60 karakter, dikkat çekici, emoji yok)",
-  "description": "YouTube açıklaması (400-500 karakter, hashtag olmadan)",
-  "tags": ["motivasyon", "basari", "hedef", "turkce", "gelisim", "ilham", "guclu", "azim", "karakter", "zihin"],
-  "pexels_query": "motivational landscape nature (İngilizce, Pexels için arama terimi)",
+  "title": "YouTube başlığı 50-60 karakter",
+  "description": "YouTube açıklaması 400-500 karakter",
+  "tags": ["motivasyon", "basari", "hedef", "turkce", "gelisim"],
+  "pexels_query": "nature mountain success landscape",
   "script_parts": [
-    "Bölüm 1: Güçlü giriş - izleyiciyi hemen yakala (3-4 cümle)",
-    "Bölüm 2: Ana mesaj - gerçek hayat örneği ver (4-5 cümle)", 
-    "Bölüm 3: Derinleştir - duygusal bağ kur (4-5 cümle)",
-    "Bölüm 4: Zirve - en güçlü mesaj (3-4 cümle)",
-    "Bölüm 5: Kapanış - harekete geçir (3-4 cümle)"
+    "Giris bolumu 3-4 cumle guclu baslangic",
+    "Ana mesaj bolumu 4-5 cumle gercek hayat ornegi",
+    "Derinlestirme bolumu 4-5 cumle duygusal bag",
+    "Zirve bolumu 3-4 cumle en guclu mesaj",
+    "Kapanis bolumu 3-4 cumle harekete gecir"
   ],
-  "hashtags": "#motivasyon #basari #hedef #turkce #gelisim #ilham #guclu #azim",
-  "thumbnail_title": "Ana başlık (max 3 kelime, büyük harf, Türkçe)",
-  "thumbnail_subtitle": "Alt başlık (max 5 kelime)"
+  "hashtags": "#motivasyon #basari #hedef #turkce #gelisim",
+  "thumbnail_title": "3 KELIME BASLIK",
+  "thumbnail_subtitle": "kisa alt baslik"
 }`
       }
     ],
@@ -88,7 +109,7 @@ JSON formatında döndür:
 
   const text = completion.choices[0].message.content.trim();
   const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error('JSON parse hatası: ' + text.substring(0, 200));
+  if (!jsonMatch) throw new Error('JSON bulunamadi: ' + text.substring(0, 200));
 
   const content = JSON.parse(jsonMatch[0]);
   content.title = fixTurkish(content.title);
@@ -101,7 +122,7 @@ JSON formatında döndür:
   return content;
 }
 
-// ─── 2. ELEVENLABS: Ses Üret ─────────────────────────────
+// ─── 2. EDGE-TTS: SES ÜRET ──────────────────────────────
 async function generateVoice(scriptParts) {
   console.log('🎙️ Edge-TTS ile ses üretiliyor...');
 
@@ -109,65 +130,20 @@ async function generateVoice(scriptParts) {
   const scriptPath = '/tmp/script.txt';
   const audioPath = '/tmp/voice.mp3';
 
-  // Script dosyasına yaz
   fs.writeFileSync(scriptPath, fullScript, 'utf8');
 
-  // Edge-TTS ile ses üret — Türkçe kadın sesi
-  await new Promise((resolve, reject) => {
-    const { exec } = require('child_process');
-    // tr-TR-EmelNeural = doğal Türkçe kadın sesi
-    // tr-TR-AhmetNeural = doğal Türkçe erkek sesi
-    exec(
-      `edge-tts --voice tr-TR-EmelNeural --file "${scriptPath}" --write-media "${audioPath}" --rate="+5%"`,
-      (error, stdout, stderr) => {
-        if (error) {
-          console.error('Edge-TTS stderr:', stderr);
-          reject(new Error(`Edge-TTS hatası: ${error.message}`));
-        } else {
-          resolve();
-        }
-      }
-    );
-  });
+  await runCommand(
+    `edge-tts --voice tr-TR-EmelNeural --file "${scriptPath}" --write-media "${audioPath}" --rate="+5%"`
+  );
 
   const stats = fs.statSync(audioPath);
-  console.log(`✅ Ses üretildi: ${(stats.size / 1024).toFixed(0)} KB`);
+  console.log(`✅ Ses: ${(stats.size / 1024).toFixed(0)} KB`);
   return audioPath;
 }
 
-  const audioPaths = [];
-  for (let i = 0; i < chunks.length; i++) {
-    const text = encodeURIComponent(chunks[i]);
-    const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${text}&tl=tr&client=tw-ob`;
-    const audioPath = `/tmp/voice_chunk_${i}.mp3`;
-    await downloadFile(url, audioPath);
-    audioPaths.push(audioPath);
-    await new Promise(r => setTimeout(r, 500));
-  }
-
-  // Chunk'ları birleştir
-  const listPath = '/tmp/audio_list.txt';
-  fs.writeFileSync(listPath, audioPaths.map(p => `file '${p}'`).join('\n'));
-  
-  const finalAudioPath = '/tmp/voice.mp3';
-  await new Promise((resolve, reject) => {
-    ffmpeg()
-      .input(listPath)
-      .inputOptions(['-f concat', '-safe 0'])
-      .outputOptions(['-c copy'])
-      .output(finalAudioPath)
-      .on('end', resolve)
-      .on('error', reject)
-      .run();
-  });
-
-  console.log('✅ Ses üretildi');
-  return finalAudioPath;
-}
-
-// ─── 3. PEXELS: Video İndir ──────────────────────────────
+// ─── 3. PEXELS: VİDEO İNDİR ─────────────────────────────
 async function downloadPexelsVideos(query, count = 5) {
-  console.log(`🎬 Pexels'tan videolar indiriliyor: "${query}"`);
+  console.log(`🎬 Pexels videoları indiriliyor: "${query}"`);
 
   const response = await fetch(
     `https://api.pexels.com/videos/search?query=${encodeURIComponent(query)}&per_page=15&orientation=landscape`,
@@ -175,10 +151,10 @@ async function downloadPexelsVideos(query, count = 5) {
   );
 
   if (!response.ok) throw new Error(`Pexels hatası: ${response.status}`);
-
   const data = await response.json();
+
   if (!data.videos || data.videos.length === 0) {
-    throw new Error('Pexels video bulunamadı: ' + query);
+    throw new Error('Pexels video bulunamadı');
   }
 
   const videoPaths = [];
@@ -186,33 +162,36 @@ async function downloadPexelsVideos(query, count = 5) {
 
   for (let i = 0; i < selected.length; i++) {
     const video = selected[i];
-    // HD video dosyasını seç
     const videoFile = video.video_files
-      .filter(f => f.quality === 'hd' || f.quality === 'sd')
-      .sort((a, b) => (b.width || 0) - (a.width || 0))[0];
+      .filter(f => f.width >= 1280)
+      .sort((a, b) => a.width - b.width)[0]
+      || video.video_files.sort((a, b) => b.width - a.width)[0];
 
     if (!videoFile) continue;
 
     const videoPath = `/tmp/pexels_${i}.mp4`;
-    console.log(`  İndiriliyor ${i + 1}/${selected.length}...`);
+    console.log(`  Video ${i + 1}/${selected.length} indiriliyor...`);
     await downloadFile(videoFile.link, videoPath);
     videoPaths.push(videoPath);
+    await sleep(500);
   }
 
   console.log(`✅ ${videoPaths.length} video indirildi`);
   return videoPaths;
 }
 
-// ─── 4. THUMBNAIL OLUŞTUR ────────────────────────────────
+// ─── 4. THUMBNAIL ────────────────────────────────────────
 async function createThumbnail(title, subtitle, videoPath) {
   console.log('🖼️ Thumbnail oluşturuluyor...');
   const thumbPath = '/tmp/thumbnail.jpg';
 
-  // Video'dan bir kare al, üstüne yazı ekle
+  const safeTitle = title.replace(/['"\\:]/g, ' ').trim();
+  const safeSubtitle = subtitle.replace(/['"\\:]/g, ' ').trim();
+
   await new Promise((resolve, reject) => {
     ffmpeg(videoPath)
       .screenshots({
-        timestamps: ['10%'],
+        timestamps: ['5%'],
         filename: 'thumb_raw.jpg',
         folder: '/tmp',
         size: '1280x720',
@@ -221,29 +200,15 @@ async function createThumbnail(title, subtitle, videoPath) {
       .on('error', reject);
   });
 
-  // ffmpeg ile başlık ekle
-  const safeTitle = title.replace(/'/g, "\\'").replace(/:/g, '\\:');
-  const safeSubtitle = subtitle.replace(/'/g, "\\'").replace(/:/g, '\\:');
+  await runCommand(
+    `ffmpeg -y -i /tmp/thumb_raw.jpg ` +
+    `-vf "colorchannelmixer=rr=0.4:gg=0.4:bb=0.5,` +
+    `drawtext=text='${safeTitle}':fontsize=85:fontcolor=white:x=(w-text_w)/2:y=(h/2)-70:shadowcolor=black:shadowx=3:shadowy=3,` +
+    `drawtext=text='${safeSubtitle}':fontsize=42:fontcolor=yellow:x=(w-text_w)/2:y=(h/2)+60:shadowcolor=black:shadowx=2:shadowy=2" ` +
+    `/tmp/thumbnail.jpg`
+  );
 
-  await new Promise((resolve, reject) => {
-    ffmpeg('/tmp/thumb_raw.jpg')
-      .videoFilter([
-        // Karartma
-        'colorchannelmixer=rr=0.4:gg=0.4:bb=0.4',
-        // Ana başlık
-        `drawtext=text='${safeTitle}':fontsize=90:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2-60:shadowcolor=black:shadowx=3:shadowy=3:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf`,
-        // Alt başlık
-        `drawtext=text='${safeSubtitle}':fontsize=45:fontcolor=#FFD700:x=(w-text_w)/2:y=(h-text_h)/2+80:shadowcolor=black:shadowx=2:shadowy=2:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf`,
-        // Alt şerit
-        `drawtext=text='🔥 Günlük Motivasyon':fontsize=35:fontcolor=white:x=(w-text_w)/2:y=h-80:shadowcolor=black:shadowx=2:shadowy=2:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf`,
-      ])
-      .output(thumbPath)
-      .on('end', resolve)
-      .on('error', reject)
-      .run();
-  });
-
-  console.log('✅ Thumbnail oluşturuldu');
+  console.log('✅ Thumbnail hazır');
   return thumbPath;
 }
 
@@ -251,7 +216,6 @@ async function createThumbnail(title, subtitle, videoPath) {
 async function createFinalVideo(videoPaths, voicePath) {
   console.log('🎞️ Video montajı yapılıyor...');
 
-  // Ses uzunluğunu öğren
   const audioDuration = await new Promise((resolve, reject) => {
     ffmpeg.ffprobe(voicePath, (err, metadata) => {
       if (err) reject(err);
@@ -259,20 +223,17 @@ async function createFinalVideo(videoPaths, voicePath) {
     });
   });
 
-  console.log(`Ses süresi: ${audioDuration.toFixed(1)} saniye`);
-
-  // Her video klip için süre hesapla
+  console.log(`Ses süresi: ${audioDuration.toFixed(1)}s`);
   const clipDuration = audioDuration / videoPaths.length;
   const trimmedPaths = [];
 
-  // Her klibi trim et
   for (let i = 0; i < videoPaths.length; i++) {
     const trimPath = `/tmp/trimmed_${i}.mp4`;
     await new Promise((resolve, reject) => {
       ffmpeg(videoPaths[i])
         .outputOptions([
           `-t ${clipDuration}`,
-          '-vf scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2',
+          '-vf scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color=black',
           '-r 30',
           '-c:v libx264',
           '-preset fast',
@@ -285,15 +246,12 @@ async function createFinalVideo(videoPaths, voicePath) {
         .run();
     });
     trimmedPaths.push(trimPath);
-    console.log(`  Klip ${i + 1}/${videoPaths.length} hazırlandı`);
+    console.log(`  Klip ${i + 1}/${videoPaths.length} hazır`);
   }
 
-  // Klipleri birleştir için liste dosyası oluştur
   const listPath = '/tmp/clips_list.txt';
-  const listContent = trimmedPaths.map(p => `file '${p}'`).join('\n');
-  fs.writeFileSync(listPath, listContent);
+  fs.writeFileSync(listPath, trimmedPaths.map(p => `file '${p}'`).join('\n'));
 
-  // Klipleri birleştir
   const mergedPath = '/tmp/merged.mp4';
   await new Promise((resolve, reject) => {
     ffmpeg()
@@ -306,7 +264,6 @@ async function createFinalVideo(videoPaths, voicePath) {
       .run();
   });
 
-  // Ses ekle + müzik mixi
   const finalPath = '/tmp/final_video.mp4';
   await new Promise((resolve, reject) => {
     ffmpeg()
@@ -330,7 +287,7 @@ async function createFinalVideo(videoPaths, voicePath) {
   return finalPath;
 }
 
-// ─── 6. YOUTUBE'A YÜKLE ──────────────────────────────────
+// ─── 6. YOUTUBE UPLOAD ───────────────────────────────────
 async function uploadToYouTube(content, videoPath, thumbnailPath) {
   console.log('📤 YouTube\'a yükleniyor...');
 
@@ -363,9 +320,8 @@ async function uploadToYouTube(content, videoPath, thumbnailPath) {
   });
 
   const videoId = videoResponse.data.id;
-  console.log(`✅ Video yüklendi: https://youtube.com/watch?v=${videoId}`);
+  console.log(`✅ Video: https://youtube.com/watch?v=${videoId}`);
 
-  // Thumbnail yükle
   try {
     await youtube.thumbnails.set({
       videoId,
@@ -373,35 +329,30 @@ async function uploadToYouTube(content, videoPath, thumbnailPath) {
     });
     console.log('✅ Thumbnail yüklendi');
   } catch (e) {
-    console.log('⚠️ Thumbnail yüklenemedi:', e.message);
+    console.log('⚠️ Thumbnail hatası:', e.message);
   }
 
   return videoId;
 }
 
-// ─── ANA FONKSİYON ────────────────────────────────────────
+// ─── ANA FONKSİYON ───────────────────────────────────────
 async function main() {
   console.log('🚀 Kaliteli motivasyon videosu üretiliyor...\n');
 
   const tempFiles = [];
 
   try {
-    // 1. İçerik üret
     const content = await generateContent();
 
-    // 2. Ses üret
     const voicePath = await generateVoice(content.script_parts);
     tempFiles.push(voicePath);
 
-    // 3. Pexels videoları indir
-    const videoPaths = await downloadPexelsVideos(content.pexels_query, 6);
+    const videoPaths = await downloadPexelsVideos(content.pexels_query, 5);
     tempFiles.push(...videoPaths);
 
-    // 4. Video montajı
     const finalVideoPath = await createFinalVideo(videoPaths, voicePath);
     tempFiles.push(finalVideoPath);
 
-    // 5. Thumbnail
     const thumbnailPath = await createThumbnail(
       content.thumbnail_title,
       content.thumbnail_subtitle,
@@ -409,13 +360,11 @@ async function main() {
     );
     tempFiles.push(thumbnailPath);
 
-    // 6. YouTube'a yükle
     const videoId = await uploadToYouTube(content, finalVideoPath, thumbnailPath);
 
-    // Temizlik
     tempFiles.forEach(f => { try { fs.unlinkSync(f); } catch(e) {} });
 
-    console.log(`\n🎉 BAŞARILI!`);
+    console.log(`\n🎉 BAŞARILI! Video ID: ${videoId}`);
     console.log(`🔗 https://youtube.com/watch?v=${videoId}`);
     process.exit(0);
 
