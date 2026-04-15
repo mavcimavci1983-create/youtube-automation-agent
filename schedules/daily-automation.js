@@ -103,19 +103,37 @@ JSON formatında döndür:
 
 // ─── 2. ELEVENLABS: Ses Üret ─────────────────────────────
 async function generateVoice(scriptParts) {
-  console.log('🎙️ Google TTS ile ses üretiliyor...');
+  console.log('🎙️ Edge-TTS ile ses üretiliyor...');
 
-  const fullScript = scriptParts.join('... ');
-  const encodedText = encodeURIComponent(fullScript.substring(0, 200));
-  
-  // gTTS benzeri - ücretsiz Google Translate TTS
-  const chunks = [];
-  const words = fullScript.split(' ');
-  const chunkSize = 40;
-  
-  for (let i = 0; i < words.length; i += chunkSize) {
-    chunks.push(words.slice(i, i + chunkSize).join(' '));
-  }
+  const fullScript = scriptParts.join('\n\n');
+  const scriptPath = '/tmp/script.txt';
+  const audioPath = '/tmp/voice.mp3';
+
+  // Script dosyasına yaz
+  fs.writeFileSync(scriptPath, fullScript, 'utf8');
+
+  // Edge-TTS ile ses üret — Türkçe kadın sesi
+  await new Promise((resolve, reject) => {
+    const { exec } = require('child_process');
+    // tr-TR-EmelNeural = doğal Türkçe kadın sesi
+    // tr-TR-AhmetNeural = doğal Türkçe erkek sesi
+    exec(
+      `edge-tts --voice tr-TR-EmelNeural --file "${scriptPath}" --write-media "${audioPath}" --rate="+5%"`,
+      (error, stdout, stderr) => {
+        if (error) {
+          console.error('Edge-TTS stderr:', stderr);
+          reject(new Error(`Edge-TTS hatası: ${error.message}`));
+        } else {
+          resolve();
+        }
+      }
+    );
+  });
+
+  const stats = fs.statSync(audioPath);
+  console.log(`✅ Ses üretildi: ${(stats.size / 1024).toFixed(0)} KB`);
+  return audioPath;
+}
 
   const audioPaths = [];
   for (let i = 0; i < chunks.length; i++) {
