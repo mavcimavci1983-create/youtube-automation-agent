@@ -68,88 +68,88 @@ async function generateStoryContent() {
   console.log('🤖 Hikaye içeriği üretiliyor...');
   const groq = new Groq({ apiKey: GROQ_API_KEY });
 
-  // Her gün farklı karakter tipi
   const day = new Date().getDay();
   const storyTypes = [
     {
       type: 'bilge_genc',
-      setup: 'Yaşlı bir bilge ve genç bir adam arasında geçen',
-      characters: 'Bilge Dede ve Genç Adam',
-      setting: 'dağ başında, çay bahçesinde veya köy meydanında',
+      setup: 'Yasli bir bilge ve genc bir adam arasinda gecen',
+      characters: 'Bilge Dede ve Genc Adam',
+      setting: 'dag basinda',
       pexels: 'old man mountain wisdom nature',
     },
     {
       type: 'baba_ogul',
-      setup: 'Bir baba ve oğlu arasında yaşanmış gerçek gibi',
-      characters: 'Baba ve Oğul',
-      setting: 'sabah kahvaltısında, işe giderken veya akşam yürüyüşünde',
+      setup: 'Bir baba ve oglu arasinda yasanmis gercek gibi',
+      characters: 'Baba ve Ogul',
+      setting: 'sabah kahvaltisinda',
       pexels: 'father son walking sunset nature',
     },
     {
       type: 'is_insani_cirak',
-      setup: 'Başarılı bir iş insanı ve genç çırağı arasında geçen',
-      characters: 'Mentor ve Genç Girişimci',
-      setting: 'ofiste, fabrikada veya kahvede',
+      setup: 'Basarili bir is insani ve genc ciragi arasinda gecen',
+      characters: 'Mentor ve Genc Girisimci',
+      setting: 'ofiste veya kahvede',
       pexels: 'business mentor office success',
     },
     {
       type: 'tarihi',
-      setup: 'Tarihi bir figürün gerçek hayatından ilham alan',
-      characters: 'Atatürk, Edison, Einstein, Mevlana veya başka büyük bir isim',
-      setting: 'tarihi bir anda, kritik bir kararın verildiği yerde',
+      setup: 'Tarihi bir figurun gercek hayatindan ilham alan',
+      characters: 'Edison veya baska buyuk bir isim',
+      setting: 'kritik bir karin verildigi yerde',
       pexels: 'historical achievement success determination',
     },
   ];
 
   const story = storyTypes[day % storyTypes.length];
-  console.log(`Hikaye tipi: ${story.type}`);
+  console.log('Hikaye tipi:', story.type);
+
+  const userPrompt = story.setup + ' bir hikaye yaz. Karakterler: ' + story.characters + '. Ortam: ' + story.setting + '.\n\n' +
+    'UYARI: Script alani KESINLIKLE minimum 130 kelime olmali.\n\n' +
+    'Script yapisi:\n' +
+    '1. SAHNE KUR (20-25 kelime)\n' +
+    '2. OLAY BASLIYOR (25-30 kelime)\n' +
+    '3. DIYALOG (35-40 kelime, en az 3 satir)\n' +
+    '4. DERS (25-30 kelime)\n' +
+    '5. IZLEYICIYE DON (20-25 kelime, Sen de... ile basla)\n\n' +
+    'ORNEK SCRIPT (bu uzunlukta yaz):\n' +
+    '1952 yilinin soguk sabahi. Ankara kucuk bir atolyede yasli demirci calisiyordu. Genc ciragi saatlerce demiri dovdu ama sekil veremedi. Biktim dedi. Bu is benim icin degil. Usta demiri aldi. Bak dedi. Bu demir soguk oldugu icin sert. Isitmadan sekil vermez. Basarisizlik da boyle. Seni isitir yumusatir. Sonra hayat sekil verir. Cirak anladi. Zorluklar onu kirmiyordu. Hazirliyordu. Sen de bugun zorlanıyor musun? O zorluk seni isitiyor. Sekillenmeye hazirlaniyorsun. Birakma.\n\n' +
+    'SADECE bu JSON formatinda dondur:\n' +
+    '{\n' +
+    '  "title": "hikaye basligi 45-55 karakter #Shorts",\n' +
+    '  "description": "250-300 karakter aciklama",\n' +
+    '  "tags": ["shorts", "hikaye", "motivasyon", "turkce", "ilham"],\n' +
+    '  "pexels_query": "' + story.pexels + '",\n' +
+    '  "script": "BURAYA TAM HIKAYEYI YAZ - 5 bolumun tamami - minimum 130 kelime",\n' +
+    '  "hashtags": "#Shorts #hikaye #motivasyon #turkce #ilham",\n' +
+    '  "thumbnail_title": "IKI KELIME",\n' +
+    '  "thumbnail_subtitle": "vurucu cumle"\n' +
+    '}';
 
   const completion = await groq.chat.completions.create({
     model: 'llama-3.3-70b-versatile',
     messages: [
       {
         role: 'system',
-        content: `Sen Türkiye'nin en iyi hikaye anlatıcısısın.
-Kısa ama derin, gerçekmiş gibi hissettiren motivasyon hikayeleri yazıyorsun.
-Her hikaye bir ders içeriyor, izleyiciyi derinden etkiliyor.
-SADECE geçerli JSON döndür. Asla markdown veya açıklama ekleme.`,
+        content: 'Sen Turkiyenin en iyi hikaye anlaticisisin. Kisa ama derin motivasyon hikayeleri yaziyorsun. SADECE gecerli JSON dondur. Asla markdown kullanma.',
       },
       {
-  role: 'user',
-        content: `${story.setup} bir hikaye yaz. Karakterler: ${story.characters}. Ortam: ${story.setting}.
+        role: 'user',
+        content: userPrompt,
+      },
+    ],
+    temperature: 0.92,
+    max_tokens: 2000,
+  });
 
-UYARI: Script alani KESINLIKLE minimum 130 kelime olmali. Daha az yazarsan sistem reddedecek.
-
-Script yapisi (her bolumu yaz, atlama):
-1. SAHNE KUR (20-25 kelime): Nerede, ne zaman, kim var
-2. OLAY BASLIYOR (25-30 kelime): Karakter bir seyle karsilasıyor
-3. DIYALOG (35-40 kelime): Iki karakter konusuyor, en az 3 satir diyalog
-4. DERS ANLATILIYOR (25-30 kelime): Hikayenin ozu ortaya cikiyor
-5. IZLEYICIYE DON (20-25 kelime): Sen de... diye basla, hayatina uygula
-
-ORNEK (bu uzunlukta yaz):
-1952 yilinin soguk bir sabahi. Ankara'da kucuk bir atolyede yasli bir demirci calisiyordu. Yaninda genc ciragi vardi. Cirak saatlerce ayni demiri dovdu ama sekil vermekte zorlanirdi. Biktim, dedi. Bu is benim icin degil. Usta elindeki demiri aldi. Bak, dedi. Bu demir sert cunku soguk. Isitmadan sekil vermez. Basarisizlik da boyledir. Seni isitir, yumusatir. Sonra hayat sekil verebilir sana. Cirak o gun anladi. Zorluklar onu kirmiyordu. Hazirliyordu. Sen de bugun zorlanıyor musun? O zorluk seni isitiyor. Sekillenmeye hazirlaniyorsun. Birakma.
-
-SADECE JSON dondur:
-{
-  "title": "hikaye basligi 45-55 karakter #Shorts",
-  "description": "250-300 karakter aciklama",
-  "tags": ["shorts", "hikaye", "motivasyon", "turkce", "ilham"],
-  "pexels_query": "${story.pexels}",
-  "script": "BURAYA TAM HIKAYEYI YAZ - 5 bolumun tamami - minimum 130 kelime",
-  "hashtags": "#Shorts #hikaye #motivasyon #turkce #ilham",
-  "thumbnail_title": "IKI KELIME",
-  "thumbnail_subtitle": "vurucu cumle"
-}`,
   const text = completion.choices[0].message.content.trim();
   const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error('JSON bulunamadı: ' + text.substring(0, 300));
+  if (!jsonMatch) throw new Error('JSON bulunamadi: ' + text.substring(0, 300));
 
   const content = JSON.parse(jsonMatch[0]);
 
   const wordCount = content.script.split(' ').length;
-  console.log(`Script: ${wordCount} kelime`);
-  if (wordCount < 100) throw new Error(`Script çok kısa: ${wordCount} kelime`);
+  console.log('Script:', wordCount, 'kelime');
+  if (wordCount < 100) throw new Error('Script cok kisa: ' + wordCount + ' kelime');
 
   content.title = fixTurkish(content.title);
   content.description = fixTurkish(content.description);
@@ -157,7 +157,7 @@ SADECE JSON dondur:
   content.thumbnail_title = fixTurkish(content.thumbnail_title);
   content.thumbnail_subtitle = fixTurkish(content.thumbnail_subtitle);
 
-  console.log(`✅ Hikaye: "${content.title}" (${wordCount} kelime)`);
+  console.log('✅ Hikaye:', content.title, '(' + wordCount + ' kelime)');
   return content;
 }
 
