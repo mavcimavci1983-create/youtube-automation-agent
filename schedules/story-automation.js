@@ -142,24 +142,27 @@ async function generateStoryContent() {
   });
 
   const text = completion.choices[0].message.content.trim();
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error('JSON bulunamadi: ' + text.substring(0, 300));
+  
+  // Kontrol karakterlerini temizle
+  const cleanText = text
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')  // kontrol karakterleri
+    .replace(/\n/g, ' ')   // satır sonlarını boşluğa çevir
+    .replace(/\r/g, '')    // carriage return temizle
+    .replace(/\t/g, ' ');  // tab temizle
 
-  const content = JSON.parse(jsonMatch[0]);
+  const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error('JSON bulunamadi: ' + cleanText.substring(0, 300));
 
-  const wordCount = content.script.split(' ').length;
-  console.log('Script:', wordCount, 'kelime');
-  if (wordCount < 100) throw new Error('Script cok kisa: ' + wordCount + ' kelime');
-
-  content.title = fixTurkish(content.title);
-  content.description = fixTurkish(content.description);
-  content.script = fixTurkish(content.script);
-  content.thumbnail_title = fixTurkish(content.thumbnail_title);
-  content.thumbnail_subtitle = fixTurkish(content.thumbnail_subtitle);
-
-  console.log('✅ Hikaye:', content.title, '(' + wordCount + ' kelime)');
-  return content;
-}
+  let content;
+  try {
+    content = JSON.parse(jsonMatch[0]);
+  } catch (parseError) {
+    // Daha agresif temizlik
+    const superClean = jsonMatch[0]
+      .replace(/[\x00-\x1F\x7F]/g, ' ')
+      .replace(/\s+/g, ' ');
+    content = JSON.parse(superClean);
+  }
 
 // ─── 2. EDGE-TTS: SES ────────────────────────────────────
 async function generateVoice(script) {
