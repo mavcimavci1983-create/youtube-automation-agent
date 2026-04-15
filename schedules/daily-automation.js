@@ -342,8 +342,6 @@ async function createShortsVideo(videoPaths, audioPath, duration, srtPath) {
   // Ses + altyazı ekle
   const finalPath = '/tmp/final_video.mp4';
 
-  // SRT altyazıyı video üzerine yak (burn-in)
-  const safeSrtPath = srtPath.replace(/'/g, "\\'");
   await new Promise((resolve, reject) => {
     ffmpeg()
       .input(mergedPath)
@@ -351,8 +349,6 @@ async function createShortsVideo(videoPaths, audioPath, duration, srtPath) {
       .outputOptions([
         '-map 0:v:0',
         '-map 1:a:0',
-        // Altyazıyı video üzerine yak - beyaz, büyük font, alt kısım
-        `-vf subtitles=${safeSrtPath}:force_style='FontName=DejaVu Sans,FontSize=18,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=2,Shadow=1,Alignment=2,MarginV=80'`,
         '-c:v libx264',
         '-preset fast',
         '-crf 22',
@@ -361,6 +357,7 @@ async function createShortsVideo(videoPaths, audioPath, duration, srtPath) {
         '-shortest',
         '-movflags +faststart',
       ])
+      .videoFilter(`subtitles=/tmp/subtitles.srt:force_style='FontSize=18,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=2,Shadow=1,Alignment=2,MarginV=80'`)
       .output(finalPath)
       .on('end', resolve)
       .on('error', reject)
