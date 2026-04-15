@@ -1,40 +1,62 @@
-name: Gunluk Motivasyon Videosu
+name: Gunluk Motivasyon Videolari
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 9 * * *'
+    - cron: '0 6 * * *'   # 09:00 Türkiye (UTC+3)
+    - cron: '0 15 * * *'  # 18:00 Türkiye (UTC+3)
 
 jobs:
-  run-automation:
+  hikaye-videosu:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 6 * * *'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
-
       - name: Install ffmpeg
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
-
       - name: Install Edge-TTS
         run: pip install edge-tts --break-system-packages
-
       - name: Install Dependencies
         run: npm install
-
-      - name: Run Video Creator
+      - name: Hikaye Videosu Olustur
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
           YOUTUBE_CHANNEL_ID: ${{ secrets.YOUTUBE_CHANNEL_ID }}
+          VIDEO_TYPE: story
+        run: node schedules/story-automation.js
+
+  motivasyon-videosu:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 15 * * *'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install ffmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+      - name: Install Edge-TTS
+        run: pip install edge-tts --break-system-packages
+      - name: Install Dependencies
+        run: npm install
+      - name: Motivasyon Videosu Olustur
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          YOUTUBE_CHANNEL_ID: ${{ secrets.YOUTUBE_CHANNEL_ID }}
+          VIDEO_TYPE: motivation
         run: node schedules/daily-automation.js
