@@ -184,7 +184,31 @@ async function generateStoryContent() {
   var wordCount = script.split(/\s+/).length;
   console.log('Script kelime sayisi:', wordCount);
 
-  if (wordCount < 80) throw new Error('Script cok kisa: ' + wordCount);
+  if (wordCount < 80) {
+    console.log('Script kisa geldi, tekrar uretiliyor...');
+    var retry = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        {
+          role: 'system',
+          content: 'Sen Türkçe motivasyon hikayecisisin. Türkçe karakterleri kullan: ş, ğ, ü, ö, ç, ı. SADECE hikaye yaz.',
+        },
+        {
+          role: 'user',
+          content: 'Asagidaki hikayeyi 130-145 kelimeye genislet. ' +
+            'Diyalog ekle, somut detay ekle, izleyiciye donen kapanis ekle.\n\n' +
+            'Mevcut hikaye:\n' + script + '\n\n' +
+            'Genisletilmis halini yaz (SADECE hikaye metni):',
+        },
+      ],
+      temperature: 0.9,
+      max_tokens: 1500,
+    });
+    script = retry.choices[0].message.content.trim();
+    script = fixTurkish(script);
+    wordCount = script.split(/\s+/).length;
+    console.log('Yeniden uretilen script:', wordCount, 'kelime');
+  }
 
   // ADIM 2: Metadata üret
   var metaCompletion = await groq.chat.completions.create({
