@@ -85,67 +85,97 @@ async function generateStoryContent() {
 
   var day = new Date().getDay();
   var storyTypes = [
-    { type: 'tarihi', pexels: 'historical achievement success' },
-    { type: 'bilge_genc', pexels: 'old man mountain wisdom' },
-    { type: 'baba_ogul', pexels: 'father son walking sunset' },
-    { type: 'is_insani', pexels: 'business mentor office success' },
-    { type: 'tarihi', pexels: 'determination perseverance nature' },
-    { type: 'bilge_genc', pexels: 'mountain peak clouds sunrise' },
-    { type: 'baba_ogul', pexels: 'family nature walk forest' },
+    { type: 'tarihi', pexels: 'historical achievement success determination' },
+    { type: 'bilge_genc', pexels: 'old man mountain wisdom peaceful' },
+    { type: 'baba_ogul', pexels: 'father son walking sunset emotional' },
+    { type: 'is_insani', pexels: 'business mentor office success young' },
+    { type: 'tarihi', pexels: 'perseverance struggle victory nature' },
+    { type: 'bilge_genc', pexels: 'mountain peak clouds sunrise inspiration' },
+    { type: 'baba_ogul', pexels: 'family nature walk forest together' },
   ];
 
   var story = storyTypes[day % storyTypes.length];
   console.log('Hikaye tipi:', story.type);
 
-  var prompts = {
-    tarihi: 'Edison, Einstein, Ataturk veya baska buyuk bir tarihi figur hakkinda gercek bir anekdot yaz.',
-    bilge_genc: 'Yasli bilge bir dede ile genc bir adam arasinda gecen kisa bir hikaye yaz. Diyalog icersin.',
-    baba_ogul: 'Bir baba ile oglu arasinda gecen kisa ama derin bir an anlat. Diyalog icersin.',
-    is_insani: 'Basarili bir is insani ile genc ciragi arasinda gecen bir sahne yaz. Diyalog icersin.',
+  var storyPrompts = {
+    tarihi: 'Edison, Einstein, Ataturk, Walt Disney veya Steve Jobs hakkinda gercek bir anekdot yaz.',
+    bilge_genc: 'Yasli bilge bir dede ile genc bir adam arasinda gecen hikaye yaz.',
+    baba_ogul: 'Bir baba ile oglu arasinda gecen derin bir an anlat.',
+    is_insani: 'Basarili bir is insani ile genc ciragi arasinda gecen sahne yaz.',
   };
 
-  var storyPrompt = prompts[story.type] || prompts.bilge_genc;
-
-  var systemMsg = 'Sen Turkce motivasyon hikayeleri yaziyorsun. SADECE JSON dondur. Markdown kullanma.';
-  var userMsg = storyPrompt + '\n\n' +
-    'Kurallari kesinlikle uy:\n' +
-    '- Script tam olarak 120-150 kelime olmali\n' +
-    '- Gercekten yasanmis gibi hissettir\n' +
-    '- Diyalog kullan\n' +
-    '- Sona izleyiciye don\n\n' +
-    'Su JSON formatinda dondur:\n' +
-    '{"title":"45-55 karakter baslik #Shorts","description":"250 karakter aciklama","tags":["shorts","hikaye","motivasyon"],"pexels_query":"' + story.pexels + '","script":"TAM HIKAYE 120-150 KELIME","hashtags":"#Shorts #hikaye #motivasyon","thumbnail_title":"IKI KELIME","thumbnail_subtitle":"kisa cumle"}';
-
-  var completion = await groq.chat.completions.create({
+  // ADIM 1: Önce sadece script üret
+  var scriptCompletion = await groq.chat.completions.create({
     model: 'llama-3.3-70b-versatile',
     messages: [
-      { role: 'system', content: systemMsg },
-      { role: 'user', content: userMsg },
+      {
+        role: 'system',
+        content: 'Sen Turkce motivasyon hikayeleri yaziyorsun. Sadece hikaye metnini yaz, baska hicbir sey yazma.',
+      },
+      {
+        role: 'user',
+        content: storyPrompts[story.type] + '\n\n' +
+          'KURALLAR:\n' +
+          '- Tam olarak 130-150 kelime yaz\n' +
+          '- Gercekten yasanmis gibi hissettir\n' +
+          '- Muhakkak diyalog kullan (en az 3 satir konusma)\n' +
+          '- Son 2 cumlede izleyiciye don, Sen de... diye basla\n' +
+          '- Kisa ve vurucu cumleler kullan\n\n' +
+          'Sadece hikaye metnini yaz, baslik veya aciklama ekleme.',
+      },
     ],
-    temperature: 0.9,
-    max_tokens: 2000,
+    temperature: 0.92,
+    max_tokens: 1000,
   });
 
-  var raw = completion.choices[0].message.content.trim();
-  var cleaned = cleanJson(raw);
-  var jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error('JSON bulunamadi');
-
-  var content = JSON.parse(jsonMatch[0]);
-  var wordCount = content.script ? content.script.split(' ').length : 0;
+  var script = scriptCompletion.choices[0].message.content.trim();
+  script = fixTurkish(script);
+  var wordCount = script.split(/\s+/).length;
   console.log('Script kelime sayisi:', wordCount);
+
   if (wordCount < 80) throw new Error('Script cok kisa: ' + wordCount);
 
-  content.title = fixTurkish(content.title);
-  content.description = fixTurkish(content.description);
-  content.script = fixTurkish(content.script);
-  content.thumbnail_title = fixTurkish(content.thumbnail_title || 'HIKAYE');
-  content.thumbnail_subtitle = fixTurkish(content.thumbnail_subtitle || 'ilham ver');
+  // ADIM 2: Metadata üret
+  var metaCompletion = await groq.chat.completions.create({
+    model: 'llama-3.3-70b-versatile',
+    messages: [
+      {
+        role: 'system',
+        content: 'YouTube metadata uretiyorsun. SADECE JSON dondur. Markdown kullanma.',
+      },
+      {
+        role: 'user',
+        content: 'Bu hikaye icin YouTube metadata uret:\n\n' + script + '\n\n' +
+          'SADECE su JSON formatinda dondur (script alani olmayacak):\n' +
+          '{"title":"45-55 karakter etkileyici baslik #Shorts","description":"250 karakter aciklama yorum yapmaya tesvik et","tags":["shorts","hikaye","motivasyon","turkce","ilham"],"hashtags":"#Shorts #hikaye #motivasyon #turkce #ilham","thumbnail_title":"IKI KELIME","thumbnail_subtitle":"vurucu kisa cumle"}',
+      },
+    ],
+    temperature: 0.7,
+    max_tokens: 500,
+  });
 
-  console.log('Hikaye hazir:', content.title);
+  var metaRaw = metaCompletion.choices[0].message.content.trim();
+  var metaCleaned = cleanJson(metaRaw);
+  var jsonMatch = metaCleaned.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error('Meta JSON bulunamadi');
+
+  var meta = JSON.parse(jsonMatch[0]);
+
+  // Birleştir
+  var content = {
+    title: fixTurkish(meta.title || 'Ilham Veren Hikaye #Shorts'),
+    description: fixTurkish(meta.description || 'Gunluk motivasyon hikayesi'),
+    tags: meta.tags || ['shorts', 'hikaye', 'motivasyon'],
+    hashtags: meta.hashtags || '#Shorts #hikaye #motivasyon',
+    thumbnail_title: fixTurkish(meta.thumbnail_title || 'HIKAYE'),
+    thumbnail_subtitle: fixTurkish(meta.thumbnail_subtitle || 'ilham al'),
+    pexels_query: story.pexels,
+    script: script,
+  };
+
+  console.log('Hikaye hazir:', content.title, '(' + wordCount + ' kelime)');
   return content;
 }
-
 async function generateVoice(script) {
   console.log('Ses uretiliyor (AhmetNeural)...');
   var scriptPath = '/tmp/script.txt';
