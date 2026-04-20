@@ -460,7 +460,7 @@ async function main() {
     const srtPath = await generateSubtitles(content.script, duration, audioPath);
     tempFiles.push(srtPath);
 
-    const videoPaths = await downloadPexelsVideos(content.pexels_query, 4);
+    var videoPaths = await downloadPexelsVideos(content.pexels_queries, 4);
     tempFiles.push(...videoPaths);
 
     const finalVideoPath = await createShortsVideo(videoPaths, audioPath, duration, srtPath);
