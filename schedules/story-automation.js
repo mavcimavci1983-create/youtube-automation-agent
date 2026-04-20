@@ -376,17 +376,23 @@ async function downloadPexelsVideos(queries, count) {
 async function createThumbnail(title, subtitle, videoPath) {
   console.log('Thumbnail olusturuluyor...');
 
+  // videoPath obje veya string olabilir
+  var inputPath = videoPath.path || videoPath;
+
   await new Promise(function(resolve, reject) {
-    ffmpeg(videoPath)
-      .outputOptions(['-vframes 1', '-vf scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920'])
+    ffmpeg(inputPath)
+      .outputOptions([
+        '-vframes 1',
+        '-vf scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920',
+      ])
       .output('/tmp/thumb_raw.jpg')
       .on('end', resolve)
       .on('error', reject)
       .run();
   });
 
-  var safeTitle = title.replace(/['"\\:]/g, '').trim();
-  var safeSub = subtitle.replace(/['"\\:]/g, '').trim();
+  var safeTitle = title.replace(/['"\\]/g, '').trim();
+  var safeSub = subtitle.replace(/['"\\]/g, '').trim();
 
   await runCommand(
     'ffmpeg -y -i /tmp/thumb_raw.jpg ' +
