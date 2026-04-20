@@ -313,46 +313,62 @@ function buildSrt(vttPath, srtPath) {
   return srtPath;
 }
 
-async function downloadPexelsVideos(query, count) {
-  console.log('Pexels videoları indiriliyor:', query);
+async function downloadPexelsVideos(queries, count) {
+  console.log('Pexels videoları indiriliyor...');
   count = count || 4;
-
-  var response = await fetch(
-    'https://api.pexels.com/videos/search?query=' + encodeURIComponent(query) + '&per_page=15&orientation=portrait',
-    { headers: { Authorization: PEXELS_API_KEY } }
-  );
-
-  var data = await response.json();
-  var videos = (data.videos || []);
-
-  if (videos.length < 2) {
-    var r2 = await fetch(
-      'https://api.pexels.com/videos/search?query=' + encodeURIComponent(query) + '&per_page=15',
-      { headers: { Authorization: PEXELS_API_KEY } }
-    );
-    var d2 = await r2.json();
-    videos = d2.videos || [];
-  }
-
-  if (videos.length === 0) throw new Error('Video bulunamadi: ' + query);
-
   var paths = [];
-  var limit = Math.min(count, videos.length);
+  var usedIds = [];
 
-  for (var i = 0; i < limit; i++) {
-    var video = videos[i];
-    var files = video.video_files.filter(function(f) { return f.width && f.height; });
-    files.sort(function(a, b) { return b.height - a.height; });
-    var vf = files[0];
-    if (!vf) continue;
+  // queries string ise diziye çevir
+  if (typeof queries === 'string') queries = [queries];
 
-    var vPath = '/tmp/pexels_' + i + '.mp4';
-    console.log('  Video', i + 1, '/', limit);
-    await downloadFile(vf.link, vPath);
-    paths.push(vPath);
-    await sleep(300);
+  for (var i = 0; i < queries.length; i++) {
+    if (paths.length >= count) break;
+
+    try {
+      // Portrait dene
+      var response = await fetch(
+        'https://api.pexels.com/videos/search?query=' +
+        encodeURIComponent(queries[i]) + '&per_page=10&orientation=portrait',
+        { headers: { Authorization: PEXELS_API_KEY } }
+      );
+      var data = await response.json();
+      var videos = data.videos || [];
+
+      // Bulamazsa landscape
+      if (videos.length === 0) {
+        response = await fetch(
+          'https://api.pexels.com/videos/search?query=' +
+          encodeURIComponent(queries[i]) + '&per_page=10',
+          { headers: { Authorization: PEXELS_API_KEY } }
+        );
+        data = await response.json();
+        videos = data.videos || [];
+      }
+
+      for (var j = 0; j < videos.length; j++) {
+        if (paths.length >= count) break;
+        if (usedIds.indexOf(videos[j].id) !== -1) continue;
+
+        var vf = videos[j].video_files
+          .filter(function(f) { return f.width && f.height; })
+          .sort(function(a, b) { return b.height - a.height; })[0];
+
+        if (!vf) continue;
+
+        usedIds.push(videos[j].id);
+        var vPath = '/tmp/pexels_' + paths.length + '.mp4';
+        console.log('  Sorgu:', queries[i], '| ID:', videos[j].id);
+        await downloadFile(vf.link, vPath);
+        paths.push({ path: vPath, duration: videos[j].duration });
+        await sleep(300);
+      }
+    } catch(e) {
+      console.log('  Hata:', queries[i], e.message);
+    }
   }
 
+  if (paths.length === 0) throw new Error('Hic video indirilemedi');
   console.log(paths.length, 'video indirildi');
   return paths;
 }
@@ -507,7 +523,8 @@ async function main() {
     buildSrt(voice.vttPath, srtPath);
     tempFiles.push(srtPath);
 
-    var videoPaths = await downloadPexelsVideos(content.pexels_query, 4);
+    // 3. Pexels videoları — içerikle uyumlu sorgularla
+    var videoPaths = await downloadPexelsVideos(content.pexels_queries, 4);
     tempFiles = tempFiles.concat(videoPaths);
 
     var finalVideo = await createShortsVideo(videoPaths, voice.audioPath, voice.duration, srtPath);
