@@ -401,19 +401,26 @@ async function createThumbnail(title, subtitle, videoPath) {
 }
 
 async function createShortsVideo(videoPaths, audioPath, duration, srtPath) {
-  console.log('Video montaji yapiliyor...');
+  console.log('Shorts montaji (1080x1920)...');
 
-  var clipDuration = (duration / videoPaths.length) + 0.5;
+  var clipDuration = duration / videoPaths.length;
   var trimmed = [];
 
   for (var i = 0; i < videoPaths.length; i++) {
     var tp = '/tmp/trimmed_' + i + '.mp4';
+    var clipD = clipDuration.toFixed(2);
+    var inputPath = videoPaths[i].path || videoPaths[i];
+
     await new Promise(function(resolve, reject) {
-      ffmpeg(videoPaths[i])
+      ffmpeg(inputPath)
         .outputOptions([
-          '-t ' + clipDuration,
+          '-t ' + clipD,
           '-vf scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1',
-          '-r 30', '-c:v libx264', '-preset fast', '-crf 22', '-an',
+          '-r 30',
+          '-c:v libx264',
+          '-preset fast',
+          '-crf 22',
+          '-an',
         ])
         .output(tp)
         .on('end', resolve)
@@ -421,7 +428,7 @@ async function createShortsVideo(videoPaths, audioPath, duration, srtPath) {
         .run();
     });
     trimmed.push(tp);
-    console.log('  Klip', i + 1, '/', videoPaths.length);
+    console.log('  Klip', i + 1, '/', videoPaths.length, 'hazir');
   }
 
   var listPath = '/tmp/clips_list.txt';
@@ -445,10 +452,15 @@ async function createShortsVideo(videoPaths, audioPath, duration, srtPath) {
       .input(mergedPath)
       .input(audioPath)
       .outputOptions([
-        '-map 0:v:0', '-map 1:a:0',
-        '-c:v libx264', '-preset fast', '-crf 22',
-        '-c:a aac', '-b:a 128k',
-        '-shortest', '-movflags +faststart',
+        '-map 0:v:0',
+        '-map 1:a:0',
+        '-c:v libx264',
+        '-preset fast',
+        '-crf 22',
+        '-c:a aac',
+        '-b:a 128k',
+        '-shortest',
+        '-movflags +faststart',
       ])
       .videoFilter("subtitles=" + srtPath + ":force_style='FontSize=14,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=2,Shadow=1,Alignment=2,MarginV=40'")
       .output(finalPath)
