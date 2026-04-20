@@ -363,17 +363,17 @@ async function createThumbnail(title, subtitle, videoPath) {
 
 // ─── 6. SHORTS VİDEO MONTAJI ─────────────────────────────
 async function createShortsVideo(videoPaths, audioPath, duration, srtPath) {
-  console.log('🎞️ Shorts video montajı (1080x1920)...');
+  console.log('Shorts montaji (1080x1920)...');
 
-  const clipDuration = duration / videoPaths.length;
-  const trimmedPaths = [];
+  var clipDuration = duration / videoPaths.length;
+  var trimmed = [];
 
-  // Her klibi dikey formata çevir ve trim et
   for (var i = 0; i < videoPaths.length; i++) {
     var tp = '/tmp/trimmed_' + i + '.mp4';
     var clipD = clipDuration.toFixed(2);
+    var inputPath = videoPaths[i].path || videoPaths[i];
+
     await new Promise(function(resolve, reject) {
-      var inputPath = videoPaths[i].path || videoPaths[i];
       ffmpeg(inputPath)
         .outputOptions([
           '-t ' + clipD,
@@ -393,12 +393,11 @@ async function createShortsVideo(videoPaths, audioPath, duration, srtPath) {
     console.log('  Klip', i + 1, '/', videoPaths.length, 'hazir');
   }
 
-  // Klipleri birleştir
-  const listPath = '/tmp/clips_list.txt';
-  fs.writeFileSync(listPath, trimmedPaths.map(p => `file '${p}'`).join('\n'));
+  var listPath = '/tmp/clips_list.txt';
+  fs.writeFileSync(listPath, trimmed.map(function(p) { return "file '" + p + "'"; }).join('\n'));
 
-  const mergedPath = '/tmp/merged.mp4';
-  await new Promise((resolve, reject) => {
+  var mergedPath = '/tmp/merged.mp4';
+  await new Promise(function(resolve, reject) {
     ffmpeg()
       .input(listPath)
       .inputOptions(['-f concat', '-safe 0'])
@@ -409,10 +408,8 @@ async function createShortsVideo(videoPaths, audioPath, duration, srtPath) {
       .run();
   });
 
-  // Ses + altyazı ekle
-  const finalPath = '/tmp/final_video.mp4';
-
-  await new Promise((resolve, reject) => {
+  var finalPath = '/tmp/final_video.mp4';
+  await new Promise(function(resolve, reject) {
     ffmpeg()
       .input(mergedPath)
       .input(audioPath)
@@ -427,15 +424,15 @@ async function createShortsVideo(videoPaths, audioPath, duration, srtPath) {
         '-shortest',
         '-movflags +faststart',
       ])
-      .videoFilter(`subtitles=/tmp/subtitles.srt:force_style='FontSize=18,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=2,Shadow=1,Alignment=2,MarginV=80'`)
+      .videoFilter("subtitles=" + srtPath + ":force_style='FontSize=14,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=2,Shadow=1,Alignment=2,MarginV=40'")
       .output(finalPath)
       .on('end', resolve)
       .on('error', reject)
       .run();
   });
 
-  const stats = fs.statSync(finalPath);
-  console.log(`✅ Video hazır: ${(stats.size / 1024 / 1024).toFixed(1)} MB`);
+  var stats = fs.statSync(finalPath);
+  console.log('Video hazir:', (stats.size / 1024 / 1024).toFixed(1), 'MB');
   return finalPath;
 }
 
