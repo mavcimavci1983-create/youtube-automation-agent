@@ -548,7 +548,7 @@ async function main() {
     var finalVideo = await createShortsVideo(videoPaths, voice.audioPath, voice.duration, srtPath);
     tempFiles.push(finalVideo);
 
-    var thumbnail = await createThumbnail(content.thumbnail_title, content.thumbnail_subtitle, videoPaths[0]);
+    var thumbnail = await createThumbnail(content.thumbnail_title, content.thumbnail_subtitle, videoPaths[0].path || videoPaths[0]);
     tempFiles.push(thumbnail);
 
     var videoId = await uploadToYouTube(content, finalVideo, thumbnail);
