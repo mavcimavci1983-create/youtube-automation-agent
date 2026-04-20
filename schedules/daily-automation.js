@@ -125,8 +125,48 @@ async function generateContent() {
 
   var content = JSON.parse(jsonMatch[0]);
 
-  var wordCount = content.script ? content.script.split(' ').length : 0;
-  if (wordCount < 80) throw new Error('Script cok kisa: ' + wordCount);
+ var wordCount = content.script ? content.script.split(' ').length : 0;
+  console.log('Script kelime sayisi:', wordCount);
+
+  if (wordCount < 80) {
+    console.log('Script kisa geldi, tekrar uretiliyor...');
+    var retryCompletion = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        {
+          role: 'system',
+          content: 'Sen Türkçe motivasyon konuşmacısısın. SADECE motivasyon metni yaz, JSON değil.',
+        },
+        {
+          role: 'user',
+          content: '"' + theme + '" teması üzerine 120-140 kelimelik güçlü Türkçe motivasyon metni yaz.\n\n' +
+            'KURALLAR:\n' +
+            '- Minimum 120 kelime\n' +
+            '- Kısa vurucu cümleler\n' +
+            '- Soru sor, izleyiciyi düşündür\n' +
+            '- Sonunda harekete geçir\n' +
+            '- Türkçe karakterleri kullan: ş, ğ, ü, ö, ç, ı\n\n' +
+            'SADECE metni yaz:',
+        },
+      ],
+      temperature: 0.9,
+      max_tokens: 1000,
+    });
+
+    content.script = fixTurkish(retryCompletion.choices[0].message.content.trim());
+    wordCount = content.script.split(' ').length;
+    console.log('Yeniden uretilen script:', wordCount, 'kelime');
+
+    // Pexels sorguları yoksa varsayılan ekle
+    if (!content.pexels_queries || content.pexels_queries.length === 0) {
+      content.pexels_queries = [
+        theme + ' motivation person',
+        'success achievement goal',
+        'person running determination',
+        'sunrise nature inspiration',
+      ];
+    }
+  }
 
   content.title = fixTurkish(content.title);
   content.description = fixTurkish(content.description);
