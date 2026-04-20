@@ -66,48 +66,77 @@ function sleep(ms) {
 // ─── 1. GROQ: İÇERİK ─────────────────────────────────────
 async function generateContent() {
   console.log('🤖 Groq ile içerik üretiliyor...');
-  const groq = new Groq({ apiKey: GROQ_API_KEY });
+  var groq = new Groq({ apiKey: GROQ_API_KEY });
 
-  const completion = await groq.chat.completions.create({
+  var themes = [
+    'vazgeçmemek ve ısrar etmek',
+    'başarısızlıktan ders çıkarmak',
+    'sabah rutini ve disiplin',
+    'kendine inanmak',
+    'zorluklarla yüzleşmek',
+    'hedef belirlemek ve odaklanmak',
+    'küçük adımların gücü',
+    'zihinsel güç ve dayanıklılık',
+  ];
+  var theme = themes[new Date().getDay() % themes.length];
+
+  var completion = await groq.chat.completions.create({
     model: 'llama-3.3-70b-versatile',
     messages: [
       {
         role: 'system',
-        content: 'Sen YouTube Shorts için Türkçe motivasyon içeriği üretiyorsun. SADECE geçerli JSON döndür. Asla markdown veya kod bloğu kullanma.'
+        content: 'Sen profesyonel Türkçe motivasyon videoları için içerik üretiyorsun. SADECE JSON dondur. Markdown kullanma.',
       },
       {
         role: 'user',
-        content: `YouTube Shorts için 45-55 saniyelik güçlü Türkçe motivasyon videosu içeriği üret.
-
-SADECE bu JSON formatında döndür:
-{
-  "title": "Başlık 40-50 karakter #Shorts",
-  "description": "Açıklama 200-300 karakter",
-  "tags": ["shorts", "motivasyon", "basari", "turkce", "gunluk"],
-  "pexels_query": "mountain peak success nature",
-  "script": "Tam video metni - 45-55 saniyelik, güçlü ve akıcı, Türkçe. Kısa cümleler kullan. Noktalama işaretleri ekle.",
-  "hashtags": "#Shorts #motivasyon #basari #turkce #gunluk",
-  "thumbnail_title": "IKI UC KELIME",
-  "thumbnail_subtitle": "kisa etkileyici cumle"
-}`
-      }
+        content: '"' + theme + '" teması üzerine güçlü Türkçe motivasyon videosu üret.\n\n' +
+          'SADECE bu JSON formatında döndür:\n' +
+          '{\n' +
+          '  "title": "YouTube başlığı 50-60 karakter #Shorts",\n' +
+          '  "description": "250-300 karakter açıklama",\n' +
+          '  "tags": ["shorts","motivasyon","basari","turkce","gunluk"],\n' +
+          '  "script": "120-140 kelime güçlü motivasyon metni",\n' +
+          '  "hashtags": "#Shorts #motivasyon #basari #turkce #gunluk",\n' +
+          '  "thumbnail_title": "IKI KELIME",\n' +
+          '  "thumbnail_subtitle": "vurucu cumle",\n' +
+          '  "pexels_queries": [\n' +
+          '    "temaya uygun gorsel sorgu 1",\n' +
+          '    "gorsel sorgu 2",\n' +
+          '    "gorsel sorgu 3",\n' +
+          '    "gorsel sorgu 4"\n' +
+          '  ]\n' +
+          '}\n\n' +
+          'pexels_queries kurallari:\n' +
+          '- Ingilizce olmali\n' +
+          '- Tema ile DOGRUDAN uyumlu olmali\n' +
+          '- "' + theme + '" icin uygun sahneler sec\n' +
+          '- Ornek: "vazgecmemek" icin "person climbing mountain", "runner finish line", "athlete training hard"\n' +
+          '- 2-4 kelime olmali\n' +
+          '- Her sorgu FARKLI bir sahne olmali',
+      },
     ],
     temperature: 0.85,
     max_tokens: 1500,
   });
 
-  const text = completion.choices[0].message.content.trim();
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error('JSON bulunamadı: ' + text.substring(0, 200));
+  var text = completion.choices[0].message.content.trim();
+  var jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error('JSON bulunamadi');
 
-  const content = JSON.parse(jsonMatch[0]);
+  var content = JSON.parse(jsonMatch[0]);
+
+  var wordCount = content.script ? content.script.split(' ').length : 0;
+  if (wordCount < 80) throw new Error('Script cok kisa: ' + wordCount);
+
   content.title = fixTurkish(content.title);
   content.description = fixTurkish(content.description);
   content.script = fixTurkish(content.script);
-  content.thumbnail_title = fixTurkish(content.thumbnail_title);
-  content.thumbnail_subtitle = fixTurkish(content.thumbnail_subtitle);
+  content.thumbnail_title = fixTurkish(content.thumbnail_title || 'BUGUN');
+  content.thumbnail_subtitle = fixTurkish(content.thumbnail_subtitle || 'basla');
+  content.pexels_queries = content.pexels_queries || [theme + ' motivation'];
 
-  console.log(`✅ İçerik: "${content.title}"`);
+  console.log('✅ İçerik:', content.title);
+  console.log('Pexels sorgular:', content.pexels_queries.join(', '));
   return content;
 }
 
