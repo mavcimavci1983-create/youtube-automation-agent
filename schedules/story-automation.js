@@ -258,7 +258,7 @@ async function generateStoryContent() {
     hashtags: meta.hashtags || '#Shorts #hikaye #motivasyon',
     thumbnail_title: fixTurkish(meta.thumbnail_title || 'HIKAYE'),
     thumbnail_subtitle: fixTurkish(meta.thumbnail_subtitle || 'ilham al'),
-    pexels_query: story.pexels,
+    pexels_queries: meta.pexels_queries || [story.pexels],
     script: script,
   };
 
