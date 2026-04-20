@@ -369,13 +369,14 @@ async function createShortsVideo(videoPaths, audioPath, duration, srtPath) {
   const trimmedPaths = [];
 
   // Her klibi dikey formata çevir ve trim et
-  for (let i = 0; i < videoPaths.length; i++) {
-    const trimPath = `/tmp/trimmed_${i}.mp4`;
-    await new Promise((resolve, reject) => {
-      ffmpeg(videoPaths[i])
+  for (var i = 0; i < videoPaths.length; i++) {
+    var tp = '/tmp/trimmed_' + i + '.mp4';
+    var clipD = clipDuration.toFixed(2);
+    await new Promise(function(resolve, reject) {
+      var inputPath = videoPaths[i].path || videoPaths[i];
+      ffmpeg(inputPath)
         .outputOptions([
-          `-t ${clipDuration + 0.5}`,
-          // Dikey 9:16 format
+          '-t ' + clipD,
           '-vf scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1',
           '-r 30',
           '-c:v libx264',
@@ -383,13 +384,13 @@ async function createShortsVideo(videoPaths, audioPath, duration, srtPath) {
           '-crf 22',
           '-an',
         ])
-        .output(trimPath)
+        .output(tp)
         .on('end', resolve)
         .on('error', reject)
         .run();
     });
-    trimmedPaths.push(trimPath);
-    console.log(`  Klip ${i + 1}/${videoPaths.length} hazır`);
+    trimmed.push(tp);
+    console.log('  Klip', i + 1, '/', videoPaths.length, 'hazir');
   }
 
   // Klipleri birleştir
