@@ -210,23 +210,37 @@ async function generateStoryContent() {
     console.log('Yeniden uretilen script:', wordCount, 'kelime');
   }
 
-  // ADIM 2: Metadata üret
+// ADIM 2: Metadata + görsel sorgular üret
   var metaCompletion = await groq.chat.completions.create({
     model: 'llama-3.3-70b-versatile',
     messages: [
       {
         role: 'system',
-        content: 'YouTube metadata uretiyorsun. SADECE JSON dondur. Markdown kullanma.',
+        content: 'YouTube metadata ve gorsel sorgulari uretiyorsun. SADECE JSON dondur.',
       },
       {
         role: 'user',
-        content: 'Bu hikaye icin YouTube metadata uret:\n\n' + script + '\n\n' +
-          'SADECE su JSON formatinda dondur (script alani olmayacak):\n' +
-          '{"title":"45-55 karakter etkileyici baslik #Shorts","description":"250 karakter aciklama yorum yapmaya tesvik et","tags":["shorts","hikaye","motivasyon","turkce","ilham"],"hashtags":"#Shorts #hikaye #motivasyon #turkce #ilham","thumbnail_title":"IKI KELIME","thumbnail_subtitle":"vurucu kisa cumle"}',
+        content: 'Bu hikaye icin metadata ve gorsel sorgulari uret:\n\n' + script + '\n\n' +
+          'SADECE su JSON formatinda dondur:\n' +
+          '{\n' +
+          '  "title": "45-55 karakter baslik #Shorts",\n' +
+          '  "description": "250 karakter aciklama",\n' +
+          '  "tags": ["shorts","hikaye","motivasyon","turkce","ilham"],\n' +
+          '  "hashtags": "#Shorts #hikaye #motivasyon #turkce #ilham",\n' +
+          '  "thumbnail_title": "IKI KELIME",\n' +
+          '  "thumbnail_subtitle": "vurucu cumle",\n' +
+          '  "pexels_queries": ["hikayeyle uyumlu sorgu 1","sorgu 2","sorgu 3","sorgu 4","sorgu 5"]\n' +
+          '}\n\n' +
+          'pexels_queries kurallari:\n' +
+          '- Her sorgu Ingilizce olmali\n' +
+          '- Hikayedeki sahne veya karakterle uyumlu olmali\n' +
+          '- Tarihi bir figur varsa o figuru veya donemi ara (ornek: "Ataturk historical Turkey", "Edison laboratory invention")\n' +
+          '- Duygu veya temaya gore sec (ornek: "father son emotional sunset", "old man mountain wisdom")\n' +
+          '- 2-4 kelime olmali',
       },
     ],
     temperature: 0.7,
-    max_tokens: 500,
+    max_tokens: 600,
   });
 
   var metaRaw = metaCompletion.choices[0].message.content.trim();
